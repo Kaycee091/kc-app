@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="kc-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#8B5CF6" />
+    </linearGradient>
+    <filter id="kc-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#2563EB" flood-opacity="0.3" />
+    </filter>
+  </defs>
+  <!-- Background squircle -->
+  <rect width="100" height="100" rx="28" fill="url(#kc-grad)" />
+  
+  <!-- Interconnected nodes network background -->
+  <circle cx="30" cy="35" r="4" fill="white" fill-opacity="0.3" />
+  <circle cx="70" cy="30" r="5" fill="white" fill-opacity="0.3" />
+  <circle cx="75" cy="70" r="4" fill="white" fill-opacity="0.3" />
+  <line x1="30" y1="35" x2="70" y2="30" stroke="white" stroke-opacity="0.2" stroke-width="2" />
+  <line x1="70" y1="30" x2="75" y2="70" stroke="white" stroke-opacity="0.2" stroke-width="2" />
+
+  <!-- KC Lettermark Bold SVG paths -->
+  <text x="50%" y="62%" text-anchor="middle" fill="white" font-family="'Inter', sans-serif" font-weight="900" font-size="44" letter-spacing="-1" filter="url(#kc-shadow)">KC</text>
+</svg>
