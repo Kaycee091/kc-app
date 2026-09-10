@@ -27,19 +27,19 @@ class KCRealtimeEngine {
       try {
         this.supabaseChannel = supabase
           .channel('public:social_events')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload: any) => {
             this.emit('post_event', payload);
           })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, (payload) => {
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, (payload: any) => {
             this.emit('reaction_event', payload);
           })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, (payload) => {
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, (payload: any) => {
             this.emit('comment_event', payload);
           })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload: any) => {
             this.emit('message_event', payload);
           })
-          .on('broadcast', { event: 'typing' }, (payload) => {
+          .on('broadcast', { event: 'typing' }, (payload: any) => {
             this.emit('typing', payload.payload);
           })
           .subscribe();

@@ -18,7 +18,7 @@ export interface AdminAuditLog {
   admin_name: string;
   admin_role: AdminRole;
   action: string;
-  target_type: 'user' | 'post' | 'comment' | 'report' | 'group' | 'page' | 'marketplace' | 'setting';
+  target_type: 'user' | 'post' | 'comment' | 'report' | 'group' | 'page' | 'marketplace' | 'setting' | 'event' | 'story';
   target_id: string;
   details: string;
   timestamp: string;

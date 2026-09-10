@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocialProvider, useSocial } from './context/SocialContext';
@@ -23,24 +23,241 @@ import { EventsView } from './components/events/EventsView';
 import { MemoriesView } from './components/memories/MemoriesView';
 import { SavedItemsView } from './components/saved/SavedItemsView';
 import { AdminLayout } from './components/admin/AdminLayout';
+import { WatchView } from './components/watch/WatchView';
 import { Avatar } from './components/ui/Avatar';
-import { Plus, Image, Smile, Video } from 'lucide-react';
+import { Plus, Image, Smile, Video, ShieldAlert } from 'lucide-react';
 import { Skeleton } from './components/ui/Skeleton';
+import { router, RouteMatch } from './router';
+import { seedService } from './services/seedService';
+import { postsService } from './services/postsService';
+
+// Dedicated Pages
+import { SearchPage } from './components/pages/SearchPage';
+import { NotificationsPage } from './components/pages/NotificationsPage';
+import { GroupDetailPage } from './components/pages/GroupDetailPage';
+import { PageDetailPage } from './components/pages/PageDetailPage';
+import { EventDetailPage } from './components/pages/EventDetailPage';
+import { MarketplaceDetailPage } from './components/pages/MarketplaceDetailPage';
+import { StoryViewerPage } from './components/pages/StoryViewerPage';
+import { SettingsPage } from './components/pages/SettingsPage';
+import { AdminLoginPage } from './components/admin/AdminLoginPage';
+import { NotFoundPage } from './components/pages/NotFoundPage';
 
 const SocialAppContent: React.FC = () => {
   const { user } = useAuth();
   const { activeTab, setActiveTab, posts, globalSearchQuery } = useSocial();
+  const { setActiveAdminRoute, setSelectedUserId } = useAdmin();
+
+  const [routeMatch, setRouteMatch] = useState<RouteMatch>(() => router.matchCurrentRoute());
   const [isComposerOpen, setIsComposerOpen] = useState(false);
 
-  // If user selected 'admin' tab in sidebar/menu, open full Admin Portal Layout!
-  if (activeTab === 'admin') {
-    return <AdminLayout onSwitchToApp={() => setActiveTab('feed')} />;
+  useEffect(() => {
+    seedService.initializeSeedData();
+  }, []);
+
+  useEffect(() => {
+    const unsub = router.subscribe((match) => {
+      setRouteMatch(match);
+
+      // Sync route patterns with activeTab & admin context
+      if (match.pattern.startsWith('/admin')) {
+        setActiveTab('admin');
+        if (match.pattern === '/admin/users/:id' && match.params.id) {
+          setActiveAdminRoute('users');
+          setSelectedUserId(match.params.id);
+        } else {
+          const rawRoute = match.pattern.replace('/admin/', '').replace('/admin', '') || 'dashboard';
+          const validRoute = rawRoute.split('/')[0] || 'dashboard';
+          setActiveAdminRoute((validRoute as any) || 'dashboard');
+          setSelectedUserId(null);
+        }
+      } else if (match.pattern.startsWith('/friends')) {
+        setActiveTab('friends');
+      } else if (match.pattern.startsWith('/watch') || match.pattern.startsWith('/videos')) {
+        setActiveTab('watch');
+      } else if (match.pattern.startsWith('/marketplace')) {
+        setActiveTab('marketplace');
+      } else if (match.pattern.startsWith('/groups')) {
+        setActiveTab('groups');
+      } else if (match.pattern.startsWith('/events')) {
+        setActiveTab('events');
+      } else if (match.pattern.startsWith('/memories')) {
+        setActiveTab('memories');
+      } else if (match.pattern.startsWith('/saved')) {
+        setActiveTab('saved');
+      } else if (match.pattern.startsWith('/profile')) {
+        setActiveTab('profile');
+      } else if (match.pattern.startsWith('/messages')) {
+        setActiveTab('messages');
+      } else if (match.pattern.startsWith('/notifications')) {
+        setActiveTab('notifications');
+      } else if (match.pattern.startsWith('/search')) {
+        setActiveTab('search');
+      } else if (match.pattern.startsWith('/settings')) {
+        setActiveTab('settings');
+      } else {
+        setActiveTab('feed');
+      }
+    });
+
+    return unsub;
+  }, [setActiveTab, setActiveAdminRoute, setSelectedUserId]);
+
+  // 1. ADMIN ROUTES HANDLER
+  if (routeMatch.pattern.startsWith('/admin')) {
+    if (routeMatch.pattern === '/admin/login') {
+      return <AdminLoginPage />;
+    }
+
+    const isAdminAuthorized = user && user.role && user.role !== 'user';
+    if (!isAdminAuthorized) {
+      return (
+        <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-[#F0F2F5] dark:bg-[#0F172A] text-center animate-fade-in">
+          <div className="w-16 h-16 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto mb-4 border border-rose-500/20">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white">403 Forbidden — Access Restricted</h1>
+          <p className="text-xs text-slate-500 max-w-md mt-2 mb-6 leading-relaxed">
+            The Connecta Administrator Portal requires elevated staff credentials (<code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-rose-500 font-bold">super_admin, admin, moderator, support</code>). Your account (<strong className="text-slate-700 dark:text-slate-300">@{user?.username}</strong>) is currently authenticated as a standard user role.
+          </p>
+          <button
+            onClick={() => router.navigate('/feed')}
+            className="px-6 py-2.5 rounded-full bg-[#2563EB] text-white font-bold text-xs shadow-lg shadow-[#2563EB]/25 hover:bg-blue-600 transition-all"
+          >
+            Return to Connecta Feed
+          </button>
+        </div>
+      );
+    }
+
+    return <AdminLayout onSwitchToApp={() => router.navigate('/feed')} />;
   }
 
-  // Filter posts if global search query active
+  // Exclude hidden posts from user feeds
+  const activeVisiblePosts = posts.filter((p) => !postsService.getHiddenPostIds().includes(p.id));
   const filteredPosts = globalSearchQuery.trim()
-    ? posts.filter((p) => p.content.toLowerCase().includes(globalSearchQuery.toLowerCase()))
-    : posts;
+    ? activeVisiblePosts.filter((p) => p.content.toLowerCase().includes(globalSearchQuery.toLowerCase()))
+    : activeVisiblePosts;
+
+  // Render main content area based on routeMatch
+  const renderMainRouteContent = () => {
+    switch (routeMatch.pattern) {
+      case '/search':
+      case '/search/:category':
+        return <SearchPage />;
+
+      case '/notifications':
+        return <NotificationsPage />;
+
+      case '/groups/:id':
+        return <GroupDetailPage groupId={routeMatch.params.id} />;
+
+      case '/pages/:id':
+        return <PageDetailPage pageId={routeMatch.params.id} />;
+
+      case '/events/:id':
+        return <EventDetailPage eventId={routeMatch.params.id} />;
+
+      case '/marketplace/:id':
+        return <MarketplaceDetailPage itemId={routeMatch.params.id} />;
+
+      case '/stories':
+      case '/stories/:id':
+        return <StoryViewerPage storyId={routeMatch.params.id} />;
+
+      case '/settings':
+      case '/settings/:subtab':
+        return <SettingsPage subtab={routeMatch.params.subtab} />;
+
+      case '/friends':
+      case '/friends/requests':
+      case '/friends/suggestions':
+      case '/following':
+        return <FriendsView />;
+
+      case '/watch':
+      case '/videos':
+        return <WatchView />;
+
+      case '/groups':
+        return <GroupFeedView />;
+
+      case '/marketplace':
+        return <MarketplaceView />;
+
+      case '/events':
+        return <EventsView />;
+
+      case '/memories':
+        return <MemoriesView />;
+
+      case '/saved':
+        return <SavedItemsView />;
+
+      case '/profile':
+      case '/profile/:username':
+        return <ProfileView />;
+
+      case '/messages':
+      case '/messages/:conversationId':
+        return <FullMessengerView />;
+
+      case '/feed':
+      case '/home':
+      case '/':
+        return (
+          <div className="space-y-4">
+            {/* 24h Stories Tray */}
+            <StoryTray />
+
+            {/* Create Post Trigger Card */}
+            <div className="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+              <div className="flex items-center gap-3">
+                <Avatar src={user?.avatar_url} name={user?.full_name || 'User'} size="md" />
+                <button
+                  onClick={() => setIsComposerOpen(true)}
+                  className="flex-1 text-left py-2.5 px-4 rounded-full bg-slate-100 dark:bg-slate-700/70 text-slate-500 dark:text-slate-400 text-xs font-medium hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors"
+                >
+                  What's on your mind, {user?.first_name || 'friend'}?
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/80 text-xs font-bold text-slate-600 dark:text-slate-300">
+                <button
+                  onClick={() => setIsComposerOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-rose-500"
+                >
+                  <Video className="w-4 h-4" /> Live Video
+                </button>
+                <button
+                  onClick={() => setIsComposerOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-emerald-500"
+                >
+                  <Image className="w-4 h-4" /> Photo/Video
+                </button>
+                <button
+                  onClick={() => setIsComposerOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-amber-500"
+                >
+                  <Smile className="w-4 h-4" /> Feeling
+                </button>
+              </div>
+            </div>
+
+            {/* Feed Stream */}
+            <div className="space-y-4">
+              {filteredPosts.map((post) => (
+                <PostCard key={post.id} post={post} />
+              ))}
+            </div>
+          </div>
+        );
+
+      case '*':
+      default:
+        return <NotFoundPage />;
+    }
+  };
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-[#F0F2F5] dark:bg-[#0F172A]">
@@ -49,68 +266,19 @@ const SocialAppContent: React.FC = () => {
       <div className="flex-1 flex justify-center w-full max-w-7xl mx-auto px-0 sm:px-4">
         <LeftSidebar />
 
-        {/* CENTER MAIN FEED & ACTIVE TAB CONTENT */}
+        {/* CENTER MAIN CONTENT AREA */}
         <main className="flex-1 max-w-2xl w-full p-2 sm:p-4 min-w-0">
-
-          {/* 1. HOME FEED TAB */}
-          {activeTab === 'feed' && (
-            <div className="space-y-4">
-              {/* 24h Stories Tray */}
-              <StoryTray />
-
-              {/* Create Post Trigger Card */}
-              <div className="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-700/80 space-y-3">
-                <div className="flex items-center gap-3">
-                  <Avatar src={user?.avatar_url} name={user?.full_name || 'User'} size="md" />
-                  <button
-                    onClick={() => setIsComposerOpen(true)}
-                    className="flex-1 text-left py-2.5 px-4 rounded-full bg-slate-100 dark:bg-slate-700/70 text-slate-500 dark:text-slate-400 text-xs font-medium hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    What's on your mind, {user?.first_name || 'friend'}?
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/80 text-xs font-bold text-slate-600 dark:text-slate-300">
-                  <button
-                    onClick={() => setIsComposerOpen(true)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-rose-500"
-                  >
-                    <Video className="w-4 h-4" /> Live Video
-                  </button>
-                  <button
-                    onClick={() => setIsComposerOpen(true)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-emerald-500"
-                  >
-                    <Image className="w-4 h-4" /> Photo/Video
-                  </button>
-                  <button
-                    onClick={() => setIsComposerOpen(true)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-amber-500"
-                  >
-                    <Smile className="w-4 h-4" /> Feeling
-                  </button>
-                </div>
-              </div>
-
-              {/* Feed Stream */}
-              <div className="space-y-4">
-                {filteredPosts.map((post) => (
-                  <PostCard key={post.id} post={post} />
-                ))}
+          {(user?.status === 'suspended' || user?.status === 'banned') && (
+            <div className="mb-4 p-4 rounded-3xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-3">
+              <span className="text-lg">⚠️</span>
+              <div>
+                <p className="font-extrabold uppercase">Account Status Notice: {user.status}</p>
+                <p className="font-medium text-[11px] opacity-90">Your account has been restricted by platform moderators. Interactive features may be limited.</p>
               </div>
             </div>
           )}
 
-          {/* OTHER TABS */}
-          {activeTab === 'friends' && <FriendsView />}
-          {activeTab === 'groups' && <GroupFeedView />}
-          {activeTab === 'marketplace' && <MarketplaceView />}
-          {activeTab === 'events' && <EventsView />}
-          {activeTab === 'memories' && <MemoriesView />}
-          {activeTab === 'saved' && <SavedItemsView />}
-          {activeTab === 'profile' && <ProfileView />}
-          {activeTab === 'messages' && <FullMessengerView />}
-
+          {renderMainRouteContent()}
         </main>
 
         <RightSidebar />
@@ -124,7 +292,6 @@ const SocialAppContent: React.FC = () => {
 
       {/* Post Composer Modal */}
       <PostComposer isOpen={isComposerOpen} onClose={() => setIsComposerOpen(false)} />
-
     </div>
   );
 };

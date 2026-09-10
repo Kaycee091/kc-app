@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { useSocial } from '../../context/SocialContext';
+import { useMessenger } from '../../context/MessengerContext';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
-import { Store, Plus, MapPin, Tag } from 'lucide-react';
+import { Store, Plus, MapPin, Tag, MessageSquare } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { uploadFile } from '../../services/storageService';
 
 export const MarketplaceView: React.FC = () => {
   const { marketplaceListings, createListing } = useSocial();
+  const { openDockedChat } = useMessenger();
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -56,7 +58,7 @@ export const MarketplaceView: React.FC = () => {
     <div className="space-y-4 max-w-5xl mx-auto pb-12 animate-fade-in">
       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
         <div>
-          <h2 className="text-xl font-black text-slate-900 dark:text-white">KC Marketplace</h2>
+          <h2 className="text-xl font-black text-slate-900 dark:text-white">Connecta Marketplace</h2>
           <p className="text-xs text-slate-500">Buy & sell items locally with trusted network members.</p>
         </div>
         <Button variant="primary" size="sm" onClick={() => setIsModalOpen(true)} leftIcon={<Plus className="w-4 h-4" />}>
@@ -89,7 +91,12 @@ export const MarketplaceView: React.FC = () => {
                   <Avatar src={item.seller?.avatar_url} name={item.seller?.full_name || 'Seller'} size="xs" />
                   <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{item.seller?.first_name}</span>
                 </div>
-                <Button size="sm" variant="outline">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  leftIcon={<MessageSquare className="w-3.5 h-3.5" />}
+                  onClick={() => item.seller && openDockedChat(item.seller)}
+                >
                   Contact Seller
                 </Button>
               </div>

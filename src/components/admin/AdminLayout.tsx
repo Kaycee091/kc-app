@@ -13,6 +13,7 @@ import { AdminMessages } from './AdminMessages';
 import { AdminNotifications } from './AdminNotifications';
 import { AdminAnalytics } from './AdminAnalytics';
 import { AdminLogs } from './AdminLogs';
+import { AdminRoles } from './AdminRoles';
 import { AdminSettings } from './AdminSettings';
 
 interface AdminLayoutProps {
@@ -30,6 +31,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onSwitchToApp }) => {
         return <AdminUsers />;
       case 'posts':
       case 'comments':
+      case 'stories':
         return <AdminPosts />;
       case 'reports':
         return <AdminReports />;
@@ -37,6 +39,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onSwitchToApp }) => {
         return <AdminModerationQueue />;
       case 'groups':
       case 'pages':
+      case 'events':
+      case 'marketplace':
         return <AdminGroupsPages />;
       case 'messages':
         return <AdminMessages />;
@@ -46,6 +50,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onSwitchToApp }) => {
         return <AdminAnalytics />;
       case 'logs':
         return <AdminLogs />;
+      case 'roles':
+        return <AdminRoles />;
       case 'settings':
         return <AdminSettings />;
       default:

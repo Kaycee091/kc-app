@@ -28,6 +28,10 @@ export interface UserProfile {
   friends_count?: number;
   role?: 'super_admin' | 'admin' | 'moderator' | 'support' | 'user';
   status?: 'active' | 'suspended' | 'banned' | 'pending';
+  password_hash?: string;
+  is_active?: boolean;
+  is_staff?: boolean;
+  is_superuser?: boolean;
 }
 
 export interface PollOption {
@@ -82,11 +86,15 @@ export interface Post {
   location?: string;
   bg_style?: string;
   poll?: PostPoll;
+  shared_post_id?: string;
+  shared_post?: Post;
   reactions: PostReaction[];
   comments: PostComment[];
   comments_count: number;
   shares_count: number;
   is_saved?: boolean;
+  is_pinned?: boolean;
+  comments_disabled?: boolean;
   created_at: string;
 }
 
@@ -121,6 +129,8 @@ export interface Group {
   members_count: number;
   is_joined?: boolean;
   rules?: string[];
+  owner_id?: string;
+  is_private?: boolean;
 }
 
 export interface Page {
@@ -132,6 +142,9 @@ export interface Page {
   cover_url?: string;
   followers_count: number;
   is_following?: boolean;
+  category?: string;
+  author?: UserProfile;
+  is_verified?: boolean;
 }
 
 export interface MarketplaceListing {
@@ -147,6 +160,8 @@ export interface MarketplaceListing {
   image_url: string;
   created_at: string;
   is_saved?: boolean;
+  images?: string[];
+  status?: 'active' | 'sold' | 'hidden';
 }
 
 export interface EventItem {
@@ -160,6 +175,10 @@ export interface EventItem {
   cover_url?: string;
   rsvp_status?: 'going' | 'interested' | 'not_going';
   attendees_count: number;
+  category?: string;
+  interested_count?: number;
+  going_count?: number;
+  is_online?: boolean;
 }
 
 export interface NotificationItem {
@@ -167,8 +186,9 @@ export interface NotificationItem {
   recipient_id: string;
   actor_id: string;
   actor?: UserProfile;
-  type: 'friend_request' | 'friend_accept' | 'like' | 'reaction' | 'comment' | 'reply' | 'tag' | 'message';
+  type: 'friend_request' | 'friend_accept' | 'like' | 'reaction' | 'comment' | 'reply' | 'tag' | 'message' | 'system';
   title: string;
+  message?: string;
   link?: string;
   is_read: boolean;
   created_at: string;

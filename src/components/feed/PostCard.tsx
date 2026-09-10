@@ -21,7 +21,10 @@ import {
   Trash2,
   Flag,
   Copy,
-  Check
+  Pin,
+  Edit2,
+  MessageSquareOff,
+  CheckCircle2
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -41,7 +44,19 @@ const EMOJI_MAP: Record<ReactionType, string> = {
 
 export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const { user } = useAuth();
-  const { toggleReaction, addComment, toggleSavePost, deletePost, submitReport, setViewingProfileUser, setActiveTab } = useSocial();
+  const {
+    toggleReaction,
+    addComment,
+    toggleSavePost,
+    deletePost,
+    votePoll,
+    editPost,
+    togglePinPost,
+    toggleCommentsDisabled,
+    submitReport,
+    setViewingProfileUser,
+    setActiveTab,
+  } = useSocial();
 
   const [showReactions, setShowReactions] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -49,11 +64,20 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [showPostMenu, setShowPostMenu] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // Edit Mode states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content);
+
   const isAuthorMe = post.author_id === user?.id;
-  const userReaction = post.reactions.find((r) => r.user_id === user?.id);
+
+  // Normalize to arrays — seeded posts may have undefined reactions/comments
+  const reactions = post.reactions ?? [];
+  const comments = post.comments ?? [];
+
+  const userReaction = reactions.find((r) => r.user_id === user?.id);
 
   // Group reaction counts by emoji
-  const reactionCounts = post.reactions.reduce<Record<string, number>>((acc, r) => {
+  const reactionCounts = reactions.reduce<Record<string, number>>((acc, r) => {
     acc[r.reaction_type] = (acc[r.reaction_type] || 0) + 1;
     return acc;
   }, {});
@@ -73,9 +97,28 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
     setTimeout(() => setCopiedLink(false), 1500);
   };
 
+  const handleSaveEdit = () => {
+    if (editContent.trim()) {
+      editPost(post.id, editContent);
+    }
+    setIsEditing(false);
+  };
+
+  // Poll percentage calculation helper
+  const totalPollVotes = post.poll
+    ? post.poll.options.reduce((sum, opt) => sum + opt.votes.length, 0)
+    : 0;
+
   return (
-    <article className="bg-white dark:bg-slate-800/90 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-700/80 p-4 space-y-3.5 transition-all animate-fade-in">
+    <article className="bg-white dark:bg-slate-800/90 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-700/80 p-4 space-y-3.5 transition-all animate-fade-in relative">
       
+      {/* Pinned Post Badge */}
+      {post.is_pinned && (
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#2563EB] bg-blue-50 dark:bg-blue-950/60 px-3 py-1 rounded-full w-max">
+          <Pin className="w-3 h-3 fill-current" /> Pinned Post
+        </div>
+      )}
+
       {/* 1. AUTHOR HEADER */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 cursor-pointer" onClick={handleAuthorClick}>
@@ -93,7 +136,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
               </h4>
               {post.feeling && (
                 <span className="text-xs text-slate-500 font-medium">
-                  is {post.feeling}
+                  is feeling {post.feeling}
                 </span>
               )}
             </div>
@@ -129,7 +172,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
           {showPostMenu && (
             <div
-              className="absolute right-0 mt-1 w-44 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-1.5 z-30 text-xs font-semibold"
+              className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-1.5 z-30 text-xs font-semibold"
               onClick={() => setShowPostMenu(false)}
             >
               <button
@@ -148,15 +191,43 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 <span>{copiedLink ? 'Link Copied!' : 'Copy Link'}</span>
               </button>
 
-              {isAuthorMe ? (
-                <button
-                  onClick={() => deletePost(post.id)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/60"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Delete Post</span>
-                </button>
-              ) : (
+              {isAuthorMe && (
+                <>
+                  <button
+                    onClick={() => togglePinPost(post.id)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <Pin className="w-4 h-4 text-[#2563EB]" />
+                    <span>{post.is_pinned ? 'Unpin Post' : 'Pin to Profile'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <Edit2 className="w-4 h-4 text-emerald-500" />
+                    <span>Edit Post</span>
+                  </button>
+
+                  <button
+                    onClick={() => toggleCommentsDisabled(post.id)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <MessageSquareOff className="w-4 h-4 text-amber-500" />
+                    <span>{post.comments_disabled ? 'Enable Comments' : 'Turn Off Comments'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => deletePost(post.id)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/60"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete Post</span>
+                  </button>
+                </>
+              )}
+
+              {!isAuthorMe && (
                 <button
                   onClick={() => submitReport('post', post.id, 'Inappropriate content')}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/60"
@@ -170,11 +241,30 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
         </div>
       </div>
 
-      {/* 2. POST CONTENT */}
-      {post.content && (
-        <div className={post.bg_style ? post.bg_style : 'text-sm text-slate-900 dark:text-slate-100 font-normal leading-relaxed whitespace-pre-wrap'}>
-          {post.content}
+      {/* 2. POST CONTENT / EDIT MODE */}
+      {isEditing ? (
+        <div className="space-y-2">
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            className="w-full p-3 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white"
+            rows={3}
+          />
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-xs text-slate-500 font-bold">
+              Cancel
+            </button>
+            <button onClick={handleSaveEdit} className="px-3 py-1 text-xs bg-[#2563EB] text-white rounded-lg font-bold">
+              Save
+            </button>
+          </div>
         </div>
+      ) : (
+        post.content && (
+          <div className={post.bg_style ? post.bg_style : 'text-sm text-slate-900 dark:text-slate-100 font-normal leading-relaxed whitespace-pre-wrap'}>
+            {post.content}
+          </div>
+        )
       )}
 
       {/* Media Image Grid */}
@@ -197,22 +287,60 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
         </div>
       )}
 
-      {/* Poll Widget */}
+      {/* Shared Post Card Attachment */}
+      {post.shared_post && (
+        <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-2">
+          <div className="flex items-center gap-2">
+            <Avatar src={post.shared_post.author?.avatar_url} name={post.shared_post.author?.full_name || 'User'} size="sm" />
+            <span className="text-xs font-bold text-slate-900 dark:text-white">{post.shared_post.author?.full_name}</span>
+          </div>
+          <p className="text-xs text-slate-700 dark:text-slate-300">{post.shared_post.content}</p>
+        </div>
+      )}
+
+      {/* Interactive Poll Widget with Live Vote Percentages */}
       {post.poll && (
         <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/80 space-y-3">
-          <h5 className="text-xs font-bold text-slate-900 dark:text-white">
-            📊 {post.poll.question}
-          </h5>
+          <div className="flex justify-between items-center">
+            <h5 className="text-xs font-bold text-slate-900 dark:text-white">
+              📊 {post.poll.question}
+            </h5>
+            <span className="text-[10px] text-slate-400 font-mono">{totalPollVotes} votes</span>
+          </div>
+
           <div className="space-y-2">
-            {post.poll.options.map((opt) => (
-              <button
-                key={opt.id}
-                className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex justify-between items-center hover:border-[#2563EB]"
-              >
-                <span>{opt.text}</span>
-                <span className="text-[10px] text-slate-400 font-mono">{opt.votes.length} votes</span>
-              </button>
-            ))}
+            {post.poll.options.map((opt) => {
+              const hasVotedThis = user ? opt.votes.includes(user.id) : false;
+              const percentage = totalPollVotes > 0 ? Math.round((opt.votes.length / totalPollVotes) * 100) : 0;
+
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => votePoll(post.id, opt.id)}
+                  className={clsx(
+                    'w-full p-2.5 rounded-xl text-xs font-semibold transition-all relative overflow-hidden text-left flex justify-between items-center border',
+                    hasVotedThis
+                      ? 'border-[#2563EB] bg-blue-100/60 dark:bg-blue-900/60 text-[#2563EB]'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:border-[#2563EB]'
+                  )}
+                >
+                  {/* Progress background bar */}
+                  <div
+                    className="absolute left-0 top-0 bottom-0 bg-[#2563EB]/15 transition-all duration-500 pointer-events-none"
+                    style={{ width: `${percentage}%` }}
+                  />
+                  
+                  <span className="z-10 flex items-center gap-1.5">
+                    {opt.text}
+                    {hasVotedThis && <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB]" />}
+                  </span>
+
+                  <span className="z-10 text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400">
+                    {percentage}% ({opt.votes.length})
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -230,7 +358,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
             </div>
           )}
           <span className="font-semibold text-[11px]">
-            {post.reactions.length > 0 ? post.reactions.length : 'Be the first to react'}
+            {reactions.length > 0 ? reactions.length : 'Be the first to react'}
           </span>
         </div>
 
@@ -282,11 +410,17 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
         {/* Comment button */}
         <button
-          onClick={() => setShowComments(!showComments)}
-          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-all"
+          disabled={post.comments_disabled}
+          onClick={() => !post.comments_disabled && setShowComments(!showComments)}
+          className={clsx(
+            'flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all',
+            post.comments_disabled
+              ? 'text-slate-400 opacity-60 cursor-not-allowed'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+          )}
         >
           <MessageSquare className="w-4 h-4" />
-          <span>Comment</span>
+          <span>{post.comments_disabled ? 'Comments Off' : 'Comment'}</span>
         </button>
 
         {/* Share button */}
@@ -300,9 +434,9 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       </div>
 
       {/* 5. COMMENT SECTION STREAM */}
-      {showComments && (
+      {showComments && !post.comments_disabled && (
         <CommentSection
-          comments={post.comments}
+          comments={comments}
           onAddComment={(content, parentId, imageUrl) => addComment(post.id, content, parentId, imageUrl)}
         />
       )}
@@ -313,3 +447,4 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
     </article>
   );
 };
+

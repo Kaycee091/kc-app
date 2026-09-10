@@ -25,9 +25,10 @@ import {
   Shield
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { router } from '../../router';
 
 export const AdminSidebar: React.FC = () => {
-  const { activeAdminRoute, setActiveAdminRoute, stats } = useAdmin();
+  const { activeAdminRoute, stats } = useAdmin();
   const { user, logout } = useAuth();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -70,6 +71,7 @@ export const AdminSidebar: React.FC = () => {
       items: [
         { id: 'notifications', label: 'Notifications', icon: <Bell className="w-4 h-4" /> },
         { id: 'logs', label: 'Admin Logs', icon: <History className="w-4 h-4" /> },
+        { id: 'roles', label: 'Staff Roles', icon: <Shield className="w-4 h-4" /> },
         { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" /> },
       ],
     },
@@ -119,7 +121,7 @@ export const AdminSidebar: React.FC = () => {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveAdminRoute(item.id)}
+                  onClick={() => router.navigate(`/admin/${item.id}`)}
                   className={clsx(
                     'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 relative group',
                     isActive

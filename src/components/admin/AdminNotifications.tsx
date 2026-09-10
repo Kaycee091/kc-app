@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Bell, Send, CheckCircle2 } from 'lucide-react';
+import { Bell, Send, CheckCircle2, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 export const AdminNotifications: React.FC = () => {
-  const { systemNotifications, createSystemNotification } = useAdmin();
+  const { systemNotifications, createSystemNotification, deleteSystemNotification } = useAdmin();
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [audience, setAudience] = useState<'everyone' | 'new_users' | 'active_users' | 'admins'>('everyone');
@@ -22,7 +22,9 @@ export const AdminNotifications: React.FC = () => {
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
       <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
-        <h2 className="text-xl font-black text-slate-900 dark:text-white">System Announcements & Notifications</h2>
+        <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+          <Bell className="w-5 h-5 text-purple-500" /> System Announcements & Notifications
+        </h2>
         <p className="text-xs text-slate-500">Broadcast network-wide announcements, maintenance notices, and targeted updates.</p>
       </div>
 
@@ -44,7 +46,7 @@ export const AdminNotifications: React.FC = () => {
             placeholder="Type your system announcement message..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            className="w-full p-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+            className="w-full p-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
             required
           />
         </div>
@@ -54,7 +56,7 @@ export const AdminNotifications: React.FC = () => {
           <select
             value={audience}
             onChange={(e) => setAudience(e.target.value as any)}
-            className="w-full p-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+            className="w-full p-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
           >
             <option value="everyone">🌎 All Registered Users (Everyone)</option>
             <option value="new_users">🆕 New Registrations (Last 7 days)</option>
@@ -73,20 +75,33 @@ export const AdminNotifications: React.FC = () => {
       {/* Dispatched History */}
       <div className="space-y-3">
         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Broadcast History</h4>
-        {systemNotifications.map((notif) => (
-          <div key={notif.id} className="p-4 bg-white dark:bg-slate-800 rounded-3xl border space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900 dark:text-white">{notif.title}</span>
-              <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#2563EB] text-[10px] font-bold uppercase">
-                Audience: {notif.target_audience}
+        {systemNotifications.length === 0 ? (
+          <p className="text-xs text-slate-400 italic">No broadcast history recorded.</p>
+        ) : (
+          systemNotifications.map((notif) => (
+            <div key={notif.id} className="p-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">{notif.title}</span>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/60 text-purple-600 text-[10px] font-bold uppercase">
+                    Audience: {notif.target_audience.replace('_', ' ')}
+                  </span>
+                  <button
+                    onClick={() => deleteSystemNotification(notif.id)}
+                    className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                    title="Delete Announcement"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{notif.message}</p>
+              <span className="text-[10px] text-slate-400 block">
+                Dispatched on {format(new Date(notif.created_at || Date.now()), 'PPP · HH:mm')}
               </span>
             </div>
-            <p className="text-xs text-slate-500">{notif.message}</p>
-            <span className="text-[10px] text-slate-400 block pt-1">
-              Dispatched on {format(new Date(notif.created_at), 'PPP · HH:mm')}
-            </span>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

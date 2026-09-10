@@ -20,14 +20,55 @@ import {
 import { authService } from './authService';
 import { realtimeEngine } from './realtimeService';
 
+const STORIES_KEY = 'connecta_stories_db';
+const MARKETPLACE_KEY = 'connecta_marketplace_db';
+const GROUPS_KEY = 'connecta_groups_db';
+const PAGES_KEY = 'connecta_pages_db';
+const EVENTS_KEY = 'connecta_events_db';
+const NOTIFICATIONS_KEY = 'connecta_notifications_db';
+const REPORTS_KEY = 'connecta_reports_db';
+
 class SocialService {
-  private stories: Story[] = DEMO_STORIES;
-  private marketplace: MarketplaceListing[] = DEMO_MARKETPLACE;
-  private groups: Group[] = DEMO_GROUPS;
-  private pages: Page[] = DEMO_PAGES;
-  private events: EventItem[] = DEMO_EVENTS;
-  private notifications: NotificationItem[] = DEMO_NOTIFICATIONS;
+  private stories: Story[] = [];
+  private marketplace: MarketplaceListing[] = [];
+  private groups: Group[] = [];
+  private pages: Page[] = [];
+  private events: EventItem[] = [];
+  private notifications: NotificationItem[] = [];
   private reports: ReportItem[] = [];
+
+  constructor() {
+    const sSt = localStorage.getItem(STORIES_KEY);
+    this.stories = sSt ? JSON.parse(sSt) : DEMO_STORIES;
+
+    const sMp = localStorage.getItem(MARKETPLACE_KEY);
+    this.marketplace = sMp ? JSON.parse(sMp) : DEMO_MARKETPLACE;
+
+    const sGr = localStorage.getItem(GROUPS_KEY);
+    this.groups = sGr ? JSON.parse(sGr) : DEMO_GROUPS;
+
+    const sPg = localStorage.getItem(PAGES_KEY);
+    this.pages = sPg ? JSON.parse(sPg) : DEMO_PAGES;
+
+    const sEv = localStorage.getItem(EVENTS_KEY);
+    this.events = sEv ? JSON.parse(sEv) : DEMO_EVENTS;
+
+    const sNt = localStorage.getItem(NOTIFICATIONS_KEY);
+    this.notifications = sNt ? JSON.parse(sNt) : DEMO_NOTIFICATIONS;
+
+    const sRp = localStorage.getItem(REPORTS_KEY);
+    this.reports = sRp ? JSON.parse(sRp) : [];
+  }
+
+  private persist() {
+    localStorage.setItem(STORIES_KEY, JSON.stringify(this.stories));
+    localStorage.setItem(MARKETPLACE_KEY, JSON.stringify(this.marketplace));
+    localStorage.setItem(GROUPS_KEY, JSON.stringify(this.groups));
+    localStorage.setItem(PAGES_KEY, JSON.stringify(this.pages));
+    localStorage.setItem(EVENTS_KEY, JSON.stringify(this.events));
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(this.notifications));
+    localStorage.setItem(REPORTS_KEY, JSON.stringify(this.reports));
+  }
 
   getStories(): Story[] {
     return this.stories.filter((s) => new Date(s.expires_at) > new Date());
@@ -50,6 +91,8 @@ class SocialService {
     };
 
     this.stories = [newStory, ...this.stories];
+    this.persist();
+    realtimeEngine.broadcast('new_story', newStory);
     return newStory;
   }
 
@@ -76,6 +119,8 @@ class SocialService {
     };
 
     this.marketplace = [newListing, ...this.marketplace];
+    this.persist();
+    realtimeEngine.broadcast('new_marketplace_listing', newListing);
     return newListing;
   }
 
@@ -99,6 +144,8 @@ class SocialService {
     };
 
     this.groups = [newGroup, ...this.groups];
+    this.persist();
+    realtimeEngine.broadcast('new_group', newGroup);
     return newGroup;
   }
 
@@ -125,6 +172,8 @@ class SocialService {
     };
 
     this.reports = [newReport, ...this.reports];
+    this.persist();
+    realtimeEngine.broadcast('new_report_submitted', newReport);
     return newReport;
   }
 

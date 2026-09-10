@@ -15,16 +15,38 @@ import {
   Settings
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { router } from '../../router';
 
 export const LeftSidebar: React.FC = () => {
   const { user } = useAuth();
-  const { activeTab, setActiveTab, setViewingProfileUser } = useSocial();
+  const { activeTab, setViewingProfileUser } = useSocial();
 
   const handleNav = (tab: ActiveTab) => {
     if (tab === 'profile' && user) {
       setViewingProfileUser(user);
+      router.navigate(`/profile/${user.username}`);
+      return;
     }
-    setActiveTab(tab);
+    if (tab === 'admin') {
+      router.navigate('/admin/dashboard');
+      return;
+    }
+    const pathMap: Record<string, string> = {
+      feed: '/feed',
+      friends: '/friends',
+      groups: '/groups',
+      marketplace: '/marketplace',
+      watch: '/watch',
+      memories: '/memories',
+      saved: '/saved',
+      events: '/events',
+      messages: '/messages',
+      notifications: '/notifications',
+      search: '/search',
+      settings: '/settings',
+    };
+    const targetPath = pathMap[tab] || '/feed';
+    router.navigate(targetPath);
   };
 
   const navItems: { id: ActiveTab; label: string; icon: React.ReactNode; color: string }[] = [
@@ -36,7 +58,9 @@ export const LeftSidebar: React.FC = () => {
     { id: 'memories', label: 'Memories', icon: <Clock className="w-5 h-5" />, color: 'text-amber-500' },
     { id: 'saved', label: 'Saved Posts', icon: <Bookmark className="w-5 h-5" />, color: 'text-purple-500' },
     { id: 'events', label: 'Events', icon: <Calendar className="w-5 h-5" />, color: 'text-teal-500' },
-    { id: 'admin', label: 'Admin Moderation', icon: <Shield className="w-5 h-5" />, color: 'text-red-500' },
+    ...(user?.role && user.role !== 'user'
+      ? [{ id: 'admin' as ActiveTab, label: 'Admin Moderation', icon: <Shield className="w-5 h-5" />, color: 'text-red-500' }]
+      : []),
   ];
 
   return (

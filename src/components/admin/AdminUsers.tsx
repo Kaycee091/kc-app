@@ -18,6 +18,8 @@ export const AdminUsers: React.FC = () => {
     unbanUser,
     deleteUserAccount,
     changeUserRole,
+    selectedUserId,
+    setSelectedUserId,
   } = useAdmin();
 
   const [search, setSearch] = useState('');
@@ -27,6 +29,13 @@ export const AdminUsers: React.FC = () => {
 
   // Selected User Modal State
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+
+  React.useEffect(() => {
+    if (selectedUserId) {
+      const found = usersList.find((u) => u.id === selectedUserId);
+      if (found) setSelectedUser(found);
+    }
+  }, [selectedUserId, usersList]);
 
   // Confirm Modal Trigger State
   const [confirmModalState, setConfirmModalState] = useState<{
@@ -310,7 +319,7 @@ export const AdminUsers: React.FC = () => {
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setSelectedUser(null)}>
+              <Button variant="ghost" onClick={() => { setSelectedUser(null); setSelectedUserId(null); }}>
                 Close
               </Button>
             </div>

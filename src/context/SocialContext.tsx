@@ -23,7 +23,9 @@ import {
   DEMO_EVENTS,
   DEMO_NOTIFICATIONS
 } from '../services/mockSocialData';
+import { socialService } from '../services/socialService';
 import { realtimeEngine } from '../services/realtimeService';
+import { postsService } from '../services/postsService';
 import { useAuth } from './AuthContext';
 
 export type ActiveTab =
@@ -38,6 +40,9 @@ export type ActiveTab =
   | 'saved'
   | 'profile'
   | 'messages'
+  | 'notifications'
+  | 'search'
+  | 'settings'
   | 'admin';
 
 interface SocialContextType {
@@ -60,6 +65,11 @@ interface SocialContextType {
   addComment: (postId: string, content: string, parentId?: string, imageUrl?: string) => Promise<void>;
   toggleSavePost: (postId: string) => void;
   deletePost: (postId: string) => void;
+  votePoll: (postId: string, optionId: string) => void;
+  editPost: (postId: string, content: string) => void;
+  sharePost: (postId: string, comment?: string) => void;
+  togglePinPost: (postId: string) => void;
+  toggleCommentsDisabled: (postId: string) => void;
   stories: Story[];
   createStory: (data: { mediaUrl?: string; textContent?: string; bgColor?: string }) => Promise<void>;
   friends: UserProfile[];
@@ -98,34 +108,91 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [activeTab, setActiveTab] = useState<ActiveTab>('feed');
   const [viewingProfileUser, setViewingProfileUser] = useState<UserProfile | null>(null);
 
-  const [posts, setPosts] = useState<Post[]>(() => {
-    const saved = localStorage.getItem('kc_posts');
-    return saved ? JSON.parse(saved) : DEMO_POSTS;
-  });
+  const [posts, setPosts] = useState<Post[]>(() => postsService.getPosts(true));
+  const [hiddenPostIds, setHiddenPostIds] = useState<string[]>(() => postsService.getHiddenPostIds());
 
   const [stories, setStories] = useState<Story[]>(() => {
-    const saved = localStorage.getItem('kc_stories');
+    const saved = localStorage.getItem('connecta_stories_db');
     return saved ? JSON.parse(saved) : DEMO_STORIES;
   });
 
   const [friends, setFriends] = useState<UserProfile[]>(() => [DEMO_USERS[1], DEMO_USERS[2]]);
   const [followingIds, setFollowingIds] = useState<string[]>(['user_sarah', 'user_john']);
-  const [marketplaceListings, setMarketplaceListings] = useState<MarketplaceListing[]>(DEMO_MARKETPLACE);
-  const [groups, setGroups] = useState<Group[]>(DEMO_GROUPS);
-  const [pages, setPages] = useState<Page[]>(DEMO_PAGES);
-  const [events, setEvents] = useState<EventItem[]>(DEMO_EVENTS);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(DEMO_NOTIFICATIONS);
+  
+  const [marketplaceListings, setMarketplaceListings] = useState<MarketplaceListing[]>(() => {
+    const saved = localStorage.getItem('connecta_marketplace_db');
+    return saved ? JSON.parse(saved) : DEMO_MARKETPLACE;
+  });
+
+  const [groups, setGroups] = useState<Group[]>(() => {
+    const saved = localStorage.getItem('connecta_groups_db');
+    return saved ? JSON.parse(saved) : DEMO_GROUPS;
+  });
+
+  const [pages, setPages] = useState<Page[]>(() => {
+    const saved = localStorage.getItem('connecta_pages_db');
+    return saved ? JSON.parse(saved) : DEMO_PAGES;
+  });
+
+  const [events, setEvents] = useState<EventItem[]>(() => {
+    const saved = localStorage.getItem('connecta_events_db');
+    return saved ? JSON.parse(saved) : DEMO_EVENTS;
+  });
+
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
+    const saved = localStorage.getItem('connecta_notifications_db');
+    return saved ? JSON.parse(saved) : DEMO_NOTIFICATIONS;
+  });
+
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
-  const [reports, setReports] = useState<ReportItem[]>([]);
-  const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  
+  const [reports, setReports] = useState<ReportItem[]>(() => {
+    const saved = localStorage.getItem('connecta_reports_db');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [blockedUsers, setBlockedUsers] = useState<string[]>(() => {
+    const saved = localStorage.getItem('connecta_blocked_users_db');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   useEffect(() => {
     localStorage.setItem('kc_posts', JSON.stringify(posts));
+    localStorage.setItem('connecta_posts_db', JSON.stringify(posts));
   }, [posts]);
 
   useEffect(() => {
     localStorage.setItem('kc_stories', JSON.stringify(stories));
+    localStorage.setItem('connecta_stories_db', JSON.stringify(stories));
   }, [stories]);
+
+  useEffect(() => {
+    localStorage.setItem('connecta_marketplace_db', JSON.stringify(marketplaceListings));
+  }, [marketplaceListings]);
+
+  useEffect(() => {
+    localStorage.setItem('connecta_groups_db', JSON.stringify(groups));
+  }, [groups]);
+
+  useEffect(() => {
+    localStorage.setItem('connecta_pages_db', JSON.stringify(pages));
+  }, [pages]);
+
+  useEffect(() => {
+    localStorage.setItem('connecta_events_db', JSON.stringify(events));
+  }, [events]);
+
+  useEffect(() => {
+    localStorage.setItem('connecta_notifications_db', JSON.stringify(notifications));
+  }, [notifications]);
+
+  useEffect(() => {
+    localStorage.setItem('connecta_reports_db', JSON.stringify(reports));
+  }, [reports]);
+
+  useEffect(() => {
+    localStorage.setItem('connecta_blocked_users_db', JSON.stringify(blockedUsers));
+  }, [blockedUsers]);
 
   // Real-time Event Listeners
   useEffect(() => {
@@ -159,10 +226,67 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       );
     });
 
+    const unsubVisibility = realtimeEngine.subscribe('post_visibility_changed', () => {
+      setHiddenPostIds(postsService.getHiddenPostIds());
+    });
+
+    const unsubAdminHide = realtimeEngine.subscribe('admin_post_hidden', () => {
+      setHiddenPostIds(postsService.getHiddenPostIds());
+      setPosts(postsService.getPosts(true));
+    });
+
+    const unsubAdminRestore = realtimeEngine.subscribe('admin_post_restored', () => {
+      setHiddenPostIds(postsService.getHiddenPostIds());
+      setPosts(postsService.getPosts(true));
+    });
+
+    const unsubAdminDeletePost = realtimeEngine.subscribe('admin_post_deleted', () => {
+      setHiddenPostIds(postsService.getHiddenPostIds());
+      setPosts(postsService.getPosts(true));
+    });
+
+    const unsubAdminComment = realtimeEngine.subscribe('admin_comment_deleted', () => {
+      setPosts(postsService.getPosts(true));
+    });
+
+    const unsubSysNotif = realtimeEngine.subscribe('admin_system_notification', (sysNotif: any) => {
+      const notifItem: NotificationItem = {
+        id: sysNotif.id || `notif_${Date.now()}`,
+        recipient_id: 'all',
+        actor_id: 'user_alex',
+        actor: {
+          id: 'user_alex',
+          username: 'Humble',
+          first_name: 'Humble',
+          last_name: 'Asogwa',
+          full_name: 'Humble Asogwa (System Admin)',
+          avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+          is_online: true,
+        },
+        type: 'system',
+        title: sysNotif.title,
+        message: sysNotif.message,
+        created_at: sysNotif.created_at || new Date().toISOString(),
+        is_read: false,
+      };
+      setNotifications((prev) => [notifItem, ...prev]);
+    });
+
+    const unsubReport = realtimeEngine.subscribe('new_report_submitted', (newReport: ReportItem) => {
+      setReports((prev) => [newReport, ...prev.filter((r) => r.id !== newReport.id)]);
+    });
+
     return () => {
       unsubPost();
       unsubReaction();
       unsubComment();
+      unsubVisibility();
+      unsubAdminHide();
+      unsubAdminRestore();
+      unsubAdminDeletePost();
+      unsubAdminComment();
+      unsubSysNotif();
+      unsubReport();
     };
   }, []);
 
@@ -257,7 +381,33 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const deletePost = (postId: string) => {
+    postsService.deletePost(postId);
     setPosts((prev) => prev.filter((p) => p.id !== postId));
+  };
+
+  const votePoll = (postId: string, optionId: string) => {
+    const updated = postsService.votePoll(postId, optionId);
+    setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
+  };
+
+  const editPost = (postId: string, content: string) => {
+    const updated = postsService.editPost(postId, content);
+    setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
+  };
+
+  const sharePost = (postId: string, comment?: string) => {
+    const shared = postsService.sharePost(postId, comment);
+    setPosts((prev) => [shared, ...prev.map((p) => (p.id === postId ? { ...p, shares_count: p.shares_count + 1 } : p))]);
+  };
+
+  const togglePinPost = (postId: string) => {
+    const updated = postsService.togglePinPost(postId);
+    setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
+  };
+
+  const toggleCommentsDisabled = (postId: string) => {
+    const updated = postsService.toggleCommentsDisabled(postId);
+    setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
   };
 
   const createStory = async (data: { mediaUrl?: string; textContent?: string; bgColor?: string }) => {
@@ -369,16 +519,8 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const submitReport = (itemType: 'post' | 'comment' | 'user' | 'marketplace' | 'group', itemId: string, reason: string) => {
     if (!user) return;
-    const newReport: ReportItem = {
-      id: `rep_${Date.now()}`,
-      item_type: itemType,
-      item_id: itemId,
-      reporter_id: user.id,
-      reason,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    };
-    setReports((prev) => [newReport, ...prev]);
+    const newReport = socialService.submitReport(itemType as any, itemId, reason);
+    setReports((prev) => [newReport, ...prev.filter((r) => r.id !== newReport.id)]);
   };
 
   const resolveReport = (reportId: string, action: 'dismiss' | 'delete') => {
@@ -408,6 +550,11 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         addComment,
         toggleSavePost,
         deletePost,
+        votePoll,
+        editPost,
+        sharePost,
+        togglePinPost,
+        toggleCommentsDisabled,
         stories,
         createStory,
         friends,

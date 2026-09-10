@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile } from '../types/social';
-import { authService, SignUpParams } from '../services/authService';
+import { authService, SignUpParams, UserSession, LoginHistoryRecord } from '../services/authService';
+import { realtimeEngine } from '../services/realtimeService';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -9,9 +10,17 @@ interface AuthContextType {
   isOnboarding: boolean;
   setIsOnboarding: (val: boolean) => void;
   pendingVerificationEmail: string | null;
+  is2FAEnabled: boolean;
+  toggle2FA: (enabled: boolean) => void;
+  activeSessions: UserSession[];
+  logoutAllOtherDevices: () => void;
+  loginHistory: LoginHistoryRecord[];
+  exportUserDataArchive: () => string;
+  deactivateAccount: () => void;
+  deleteAccount: () => void;
   signup: (params: SignUpParams) => Promise<{ success: boolean; error?: string }>;
   verifyEmailCode: (code: string) => Promise<{ success: boolean; error?: string }>;
-  login: (loginId: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  login: (loginId: string, pass: string) => Promise<{ success: boolean; user?: UserProfile; error?: string }>;
   logout: () => void;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>;
 }
@@ -23,6 +32,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
+  const [is2FAEnabled, setIs2FAEnabled] = useState<boolean>(() => authService.get2FAStatus());
+  const [activeSessions, setActiveSessions] = useState<UserSession[]>(() => authService.getActiveSessions());
+  const [loginHistory] = useState<LoginHistoryRecord[]>(() => authService.getLoginHistory());
+
+  useEffect(() => {
+    const unsubStatus = realtimeEngine.subscribe('admin_user_status_change', ({ userId, status }) => {
+      if (user && user.id === userId) {
+        setUser((prev) => (prev ? { ...prev, status } : null));
+      }
+    });
+
+    const unsubRole = realtimeEngine.subscribe('admin_user_role_change', ({ userId, role }) => {
+      if (user && user.id === userId) {
+        setUser((prev) => (prev ? { ...prev, role } : null));
+      }
+    });
+
+    return () => {
+      unsubStatus();
+      unsubRole();
+    };
+  }, [user]);
+
+  const handleToggle2FA = (enabled: boolean) => {
+    const updated = authService.toggle2FA(enabled);
+    setIs2FAEnabled(updated);
+  };
+
+  const handleLogoutAllOtherDevices = () => {
+    authService.logoutAllOtherDevices();
+    setActiveSessions(authService.getActiveSessions());
+  };
+
+  const handleExportData = () => {
+    return authService.exportUserDataArchive();
+  };
+
+  const handleDeactivateAccount = () => {
+    authService.deactivateAccount();
+    setUser(null);
+  };
+
+  const handleDeleteAccount = () => {
+    authService.deleteAccount();
+    setUser(null);
+  };
 
   const signup = async (params: SignUpParams) => {
     setIsLoading(true);
@@ -79,6 +134,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isOnboarding,
         setIsOnboarding,
         pendingVerificationEmail,
+        is2FAEnabled,
+        toggle2FA: handleToggle2FA,
+        activeSessions,
+        logoutAllOtherDevices: handleLogoutAllOtherDevices,
+        loginHistory,
+        exportUserDataArchive: handleExportData,
+        deactivateAccount: handleDeactivateAccount,
+        deleteAccount: handleDeleteAccount,
         signup,
         verifyEmailCode,
         login,
@@ -96,3 +159,4 @@ export const useAuth = () => {
   if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
+

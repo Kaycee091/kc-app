@@ -3,20 +3,30 @@ import { useSocial, ActiveTab } from '../../context/SocialContext';
 import { useAuth } from '../../context/AuthContext';
 import { Home, Users, PlusCircle, Bell, Menu } from 'lucide-react';
 import { clsx } from 'clsx';
+import { router } from '../../router';
 
 interface MobileBottomNavProps {
   onOpenCreatePost: () => void;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenCreatePost }) => {
-  const { activeTab, setActiveTab, unreadNotifCount, setViewingProfileUser } = useSocial();
+  const { activeTab, unreadNotifCount, setViewingProfileUser } = useSocial();
   const { user } = useAuth();
 
   const handleTab = (tab: ActiveTab) => {
     if (tab === 'profile' && user) {
       setViewingProfileUser(user);
+      router.navigate(`/profile/${user.username}`);
+      return;
     }
-    setActiveTab(tab);
+    const pathMap: Record<string, string> = {
+      feed: '/feed',
+      friends: '/friends',
+      notifications: '/notifications',
+      profile: '/profile',
+    };
+    const targetPath = pathMap[tab] || '/feed';
+    router.navigate(targetPath);
   };
 
   return (
@@ -47,8 +57,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenCreatePo
       </button>
 
       <button
-        onClick={() => handleTab('feed')}
-        className={clsx('relative flex flex-col items-center gap-0.5 text-[10px] font-bold text-slate-500')}
+        onClick={() => handleTab('notifications')}
+        className={clsx('relative flex flex-col items-center gap-0.5 text-[10px] font-bold', activeTab === 'notifications' ? 'text-[#2563EB]' : 'text-slate-500')}
       >
         <Bell className="w-5 h-5" />
         <span>Alerts</span>

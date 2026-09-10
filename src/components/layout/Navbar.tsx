@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocial, ActiveTab } from '../../context/SocialContext';
 import { useMessenger } from '../../context/MessengerContext';
+import { router } from '../../router';
 import { Avatar } from '../ui/Avatar';
 import { ConnectionBadge } from '../ui/ConnectionBadge';
 import {
@@ -43,10 +44,34 @@ export const Navbar: React.FC = () => {
   const totalUnreadMessages = conversations.reduce((acc, c) => acc + (c.unread_count || 0), 0);
 
   const handleNavClick = (tab: ActiveTab) => {
+    setShowUserDropdown(false);
+    setShowNotifications(false);
+
     if (tab === 'profile' && user) {
       setViewingProfileUser(user);
+      router.navigate(`/profile/${user.username}`);
+      return;
     }
-    setActiveTab(tab);
+    if (tab === 'admin') {
+      router.navigate('/admin/dashboard');
+      return;
+    }
+    const pathMap: Record<string, string> = {
+      feed: '/feed',
+      friends: '/friends',
+      groups: '/groups',
+      marketplace: '/marketplace',
+      watch: '/watch',
+      memories: '/memories',
+      saved: '/saved',
+      events: '/events',
+      messages: '/messages',
+      notifications: '/notifications',
+      search: '/search',
+      settings: '/settings',
+    };
+    const targetPath = pathMap[tab] || '/feed';
+    router.navigate(targetPath);
   };
 
   return (
@@ -249,13 +274,18 @@ export const Navbar: React.FC = () => {
                 <span>Saved Items</span>
               </button>
 
-              <button
-                onClick={() => handleNavClick('admin')}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-              >
-                <Shield className="w-4 h-4 text-emerald-500" />
-                <span>Admin Moderation</span>
-              </button>
+              {user?.role && user.role !== 'user' && (
+                <button
+                  onClick={() => {
+                    setShowUserDropdown(false);
+                    router.navigate('/admin/dashboard');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                >
+                  <Shield className="w-4 h-4 text-emerald-500" />
+                  <span>Admin Moderation</span>
+                </button>
+              )}
 
               <div className="border-t border-slate-100 dark:border-slate-700 mt-1 pt-1">
                 <button
