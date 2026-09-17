@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSocial } from '../../context/SocialContext';
 import { Avatar } from '../ui/Avatar';
 import { Button } from '../ui/Button';
-import { UserPlus, UserCheck, UserX, Search } from 'lucide-react';
+import { UserPlus, UserCheck, UserX, Search, Users } from 'lucide-react';
 import { DEMO_USERS } from '../../services/mockSocialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -40,20 +40,35 @@ export const FriendsView: React.FC = () => {
       </div>
 
       {tab === 'all' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {friends.map((f) => (
-            <div key={f.id} className="p-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar src={f.avatar_url} name={f.full_name} size="lg" isOnline showOnlineStatus />
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">{f.full_name}</h4>
-                  <p className="text-[11px] text-slate-400">@{f.username}</p>
-                </div>
-              </div>
-              <UserCheck className="w-5 h-5 text-emerald-500" />
+        friends.length === 0 ? (
+          <div className="text-center py-16 px-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 space-y-3 shadow-sm">
+            <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-500 mx-auto flex items-center justify-center">
+              <Users className="w-7 h-7" />
             </div>
-          ))}
-        </div>
+            <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">You haven't added any friends yet</h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+              Check out People You May Know to connect with colleagues, friends, and community members.
+            </p>
+            <Button size="sm" variant="primary" onClick={() => setTab('suggestions')} leftIcon={<UserPlus className="w-4 h-4" />}>
+              Explore Suggestions
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {friends.map((f) => (
+              <div key={f.id} className="p-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Avatar src={f.avatar_url} name={f.full_name} size="lg" isOnline showOnlineStatus />
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">{f.full_name}</h4>
+                    <p className="text-[11px] text-slate-400">@{f.username}</p>
+                  </div>
+                </div>
+                <UserCheck className="w-5 h-5 text-emerald-500" />
+              </div>
+            ))}
+          </div>
+        )
       )}
 
       {tab === 'requests' && (

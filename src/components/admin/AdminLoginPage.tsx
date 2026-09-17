@@ -60,12 +60,60 @@ export const AdminLoginPage: React.FC = () => {
           </div>
         )}
 
-        {/* Demo Credentials Tip */}
-        <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-700/80 text-[11px] text-slate-300 space-y-1">
-          <p className="font-bold text-emerald-400">Authorized Administrator Account:</p>
-          <p><strong>Email:</strong> asogwakenechukwu284@gmail.com</p>
-          <p><strong>Username:</strong> Humble</p>
-          <p><strong>Password:</strong> treasuremu</p>
+        {/* Demo Credentials Tip & Quick Fill */}
+        <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-700/80 text-[11px] text-slate-300 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-emerald-400">Authorized Admin Accounts:</span>
+            <span className="text-[10px] text-slate-400">Click to fill & sign in</span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              type="button"
+              onClick={async () => {
+                setLoginId('asogwakenechukwu284@gmail.com');
+                setPassword('treasuremu');
+                setError('');
+                setIsLoading(true);
+                const res = await login('asogwakenechukwu284@gmail.com', 'treasuremu');
+                setIsLoading(false);
+                if (res.success && res.user && res.user.role !== 'user') {
+                  router.navigate('/admin/dashboard');
+                } else {
+                  setError(res.error || 'Login failed');
+                }
+              }}
+              className="p-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-left transition-colors group"
+            >
+              <p className="font-bold text-emerald-400 group-hover:text-emerald-300">⚡ Super Admin</p>
+              <p className="text-[10px] text-slate-300">Alex (Humble)</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                setLoginId('sarah@connecta.app');
+                setPassword('treasuremu');
+                setError('');
+                setIsLoading(true);
+                const res = await login('sarah@connecta.app', 'treasuremu');
+                setIsLoading(false);
+                if (res.success && res.user && res.user.role !== 'user') {
+                  router.navigate('/admin/dashboard');
+                } else {
+                  setError(res.error || 'Login failed');
+                }
+              }}
+              className="p-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-left transition-colors group"
+            >
+              <p className="font-bold text-blue-400 group-hover:text-blue-300">⚡ Moderator</p>
+              <p className="text-[10px] text-slate-300">Sarah Adams</p>
+            </button>
+          </div>
+
+          <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-800">
+            <strong>Password:</strong> <code className="text-slate-200">treasuremu</code>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

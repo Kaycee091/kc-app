@@ -88,6 +88,7 @@ interface SocialContextType {
   toggleFollowPage: (pageId: string) => void;
   events: EventItem[];
   toggleRsvpEvent: (eventId: string, status: 'going' | 'interested' | 'not_going') => void;
+  createEvent: (data: Partial<EventItem>) => void;
   notifications: NotificationItem[];
   unreadNotifCount: number;
   markNotificationsAsRead: () => void;
@@ -99,6 +100,33 @@ interface SocialContextType {
   blockedUsers: string[];
   toggleBlockUser: (targetUserId: string) => void;
 }
+
+export const normalizeEvent = (item: any): EventItem => {
+  const title = item.title || item.name || 'Connecta Gathering';
+  let startTime = item.start_time || item.event_date;
+  if (!startTime || isNaN(new Date(startTime).getTime())) {
+    startTime = new Date(Date.now() + 86400000 * 3).toISOString();
+  }
+  return {
+    id: String(item.id || `evt_${Math.random().toString(36).slice(2, 9)}`),
+    organizer_id: item.organizer_id || item.creator_id || 'system',
+    organizer: item.organizer,
+    title,
+    name: title,
+    description: item.description || 'Join us for an exciting gathering! Connect with attendees and experience great activities.',
+    location: item.location || 'San Francisco, CA',
+    start_time: startTime,
+    event_date: startTime,
+    end_time: item.end_time,
+    cover_url: item.cover_url || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop&q=80',
+    rsvp_status: item.rsvp_status || null,
+    attendees_count: typeof item.attendees_count === 'number' ? item.attendees_count : (typeof item.going_count === 'number' ? item.going_count : 18),
+    interested_count: typeof item.interested_count === 'number' ? item.interested_count : 35,
+    going_count: typeof item.going_count === 'number' ? item.going_count : (typeof item.attendees_count === 'number' ? item.attendees_count : 18),
+    category: item.category || 'Tech & Culture',
+    is_online: Boolean(item.is_online),
+  };
+};
 
 const SocialContext = createContext<SocialContextType | undefined>(undefined);
 
@@ -116,8 +144,21 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return saved ? JSON.parse(saved) : DEMO_STORIES;
   });
 
-  const [friends, setFriends] = useState<UserProfile[]>(() => [DEMO_USERS[1], DEMO_USERS[2]]);
-  const [followingIds, setFollowingIds] = useState<string[]>(['user_sarah', 'user_john']);
+  const [friends, setFriends] = useState<UserProfile[]>(() => {
+    if (!user) return [];
+    const saved = localStorage.getItem(`connecta_friends_${user.id}`);
+    if (saved) return JSON.parse(saved);
+    if (user.is_new_user || user.friends_count === 0) return [];
+    return [DEMO_USERS[1], DEMO_USERS[2]];
+  });
+
+  const [followingIds, setFollowingIds] = useState<string[]>(() => {
+    if (!user) return [];
+    const saved = localStorage.getItem(`connecta_following_${user.id}`);
+    if (saved) return JSON.parse(saved);
+    if (user.is_new_user) return [];
+    return ['user_sarah'];
+  });
   
   const [marketplaceListings, setMarketplaceListings] = useState<MarketplaceListing[]>(() => {
     const saved = localStorage.getItem('connecta_marketplace_db');
@@ -126,7 +167,16 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [groups, setGroups] = useState<Group[]>(() => {
     const saved = localStorage.getItem('connecta_groups_db');
-    return saved ? JSON.parse(saved) : DEMO_GROUPS;
+    const baseGroups: Group[] = saved ? JSON.parse(saved) : DEMO_GROUPS;
+    if (user?.is_new_user) {
+      const userJoined = localStorage.getItem(`connecta_joined_groups_${user.id}`);
+      const joinedIds: string[] = userJoined ? JSON.parse(userJoined) : [];
+      return baseGroups.map((g) => ({
+        ...g,
+        is_joined: joinedIds.includes(g.id),
+      }));
+    }
+    return baseGroups;
   });
 
   const [pages, setPages] = useState<Page[]>(() => {
@@ -136,12 +186,33 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [events, setEvents] = useState<EventItem[]>(() => {
     const saved = localStorage.getItem('connecta_events_db');
-    return saved ? JSON.parse(saved) : DEMO_EVENTS;
+    const rawList: any[] = saved ? JSON.parse(saved) : DEMO_EVENTS;
+    return rawList.map(normalizeEvent);
   });
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    const saved = localStorage.getItem('connecta_notifications_db');
-    return saved ? JSON.parse(saved) : DEMO_NOTIFICATIONS;
+    if (!user) return [];
+    const saved = localStorage.getItem(`connecta_notifications_${user.id}`);
+    if (saved) return JSON.parse(saved);
+    if (user.is_new_user) {
+      return [
+        {
+          id: `welcome_notif_${user.id}`,
+          recipient_id: user.id,
+          actor: {
+            id: 'system_connecta',
+            name: 'Connecta System',
+            avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150',
+          },
+          type: 'system',
+          content: `Welcome to Connecta, ${user.first_name || 'friend'}! Start by connecting with friends and discovering communities.`,
+          created_at: new Date().toISOString(),
+          is_read: false,
+        },
+      ];
+    }
+    const globalSaved = localStorage.getItem('connecta_notifications_db');
+    return globalSaved ? JSON.parse(globalSaved) : DEMO_NOTIFICATIONS;
   });
 
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
@@ -171,6 +242,18 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [marketplaceListings]);
 
   useEffect(() => {
+    if (user) {
+      localStorage.setItem(`connecta_friends_${user.id}`, JSON.stringify(friends));
+    }
+  }, [friends, user]);
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(`connecta_following_${user.id}`, JSON.stringify(followingIds));
+    }
+  }, [followingIds, user]);
+
+  useEffect(() => {
     localStorage.setItem('connecta_groups_db', JSON.stringify(groups));
   }, [groups]);
 
@@ -181,6 +264,29 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     localStorage.setItem('connecta_events_db', JSON.stringify(events));
   }, [events]);
+
+  useEffect(() => {
+    fetch('/api/v1/events/')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return;
+        const rawList = Array.isArray(data) ? data : (data.results || []);
+        if (rawList.length > 0) {
+          const apiEvents = rawList.map(normalizeEvent);
+          setEvents((prev) => {
+            const map = new Map(prev.map((e) => [e.id, e]));
+            const mergedApi = apiEvents.map((ae: EventItem) => {
+              const local = map.get(ae.id);
+              return local ? { ...ae, rsvp_status: local.rsvp_status, attendees_count: local.attendees_count } : ae;
+            });
+            const apiIds = new Set(apiEvents.map((e: EventItem) => e.id));
+            const clientOnly = prev.filter((e) => !apiIds.has(e.id));
+            return [...clientOnly, ...mergedApi];
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('connecta_notifications_db', JSON.stringify(notifications));
@@ -479,9 +585,24 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const toggleJoinGroup = (groupId: string) => {
-    setGroups((prev) =>
-      prev.map((g) => (g.id === groupId ? { ...g, is_joined: !g.is_joined } : g))
-    );
+    setGroups((prev) => {
+      const updated = prev.map((g) => {
+        if (g.id === groupId) {
+          const nextJoined = !g.is_joined;
+          return {
+            ...g,
+            is_joined: nextJoined,
+            members_count: nextJoined ? g.members_count + 1 : Math.max(0, g.members_count - 1),
+          };
+        }
+        return g;
+      });
+      if (user) {
+        const joinedIds = updated.filter((g) => g.is_joined).map((g) => g.id);
+        localStorage.setItem(`connecta_joined_groups_${user.id}`, JSON.stringify(joinedIds));
+      }
+      return updated;
+    });
   };
 
   const createGroup = (name: string, description: string, privacy: 'public' | 'private') => {
@@ -507,8 +628,61 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const toggleRsvpEvent = (eventId: string, status: 'going' | 'interested' | 'not_going') => {
     setEvents((prev) =>
-      prev.map((e) => (e.id === eventId ? { ...e, rsvp_status: status } : e))
+      prev.map((e) => {
+        if (e.id !== eventId) return e;
+        const prevStatus = e.rsvp_status;
+        const newStatus = prevStatus === status ? null : status;
+        let attendees = e.attendees_count || 0;
+        let interested = e.interested_count || 0;
+
+        if (prevStatus === 'going') attendees = Math.max(0, attendees - 1);
+        if (prevStatus === 'interested') interested = Math.max(0, interested - 1);
+
+        if (newStatus === 'going') attendees += 1;
+        if (newStatus === 'interested') interested += 1;
+
+        return {
+          ...e,
+          rsvp_status: newStatus,
+          attendees_count: attendees,
+          interested_count: interested,
+        };
+      })
     );
+
+    // Call backend RSVP endpoint asynchronously
+    fetch(`/api/v1/events/${eventId}/rsvp/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }).catch(() => {});
+  };
+
+  const createEvent = (data: Partial<EventItem>) => {
+    if (!user) return;
+    const newEvent = normalizeEvent({
+      ...data,
+      id: `evt_${Date.now()}`,
+      organizer_id: user.id,
+      organizer: user,
+      rsvp_status: 'going',
+      attendees_count: 1,
+    });
+    setEvents((prev) => [newEvent, ...prev]);
+
+    // Also attempt to push to backend if available
+    fetch('/api/v1/events/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newEvent.title,
+        description: newEvent.description,
+        location: newEvent.location,
+        event_date: newEvent.start_time,
+        category: newEvent.category,
+        cover_url: newEvent.cover_url,
+      }),
+    }).catch(() => {});
   };
 
   const unreadNotifCount = notifications.filter((n) => !n.is_read).length;
@@ -573,6 +747,7 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         toggleFollowPage,
         events,
         toggleRsvpEvent,
+        createEvent,
         notifications,
         unreadNotifCount,
         markNotificationsAsRead,

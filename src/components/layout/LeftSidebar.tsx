@@ -28,7 +28,11 @@ export const LeftSidebar: React.FC = () => {
       return;
     }
     if (tab === 'admin') {
-      router.navigate('/admin/dashboard');
+      if (user?.role && user.role !== 'user') {
+        router.navigate('/admin/dashboard');
+      } else {
+        router.navigate('/admin/login');
+      }
       return;
     }
     const pathMap: Record<string, string> = {
@@ -58,8 +62,16 @@ export const LeftSidebar: React.FC = () => {
     { id: 'memories', label: 'Memories', icon: <Clock className="w-5 h-5" />, color: 'text-amber-500' },
     { id: 'saved', label: 'Saved Posts', icon: <Bookmark className="w-5 h-5" />, color: 'text-purple-500' },
     { id: 'events', label: 'Events', icon: <Calendar className="w-5 h-5" />, color: 'text-teal-500' },
+    { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" />, color: 'text-slate-500' },
     ...(user?.role && user.role !== 'user'
-      ? [{ id: 'admin' as ActiveTab, label: 'Admin Moderation', icon: <Shield className="w-5 h-5" />, color: 'text-red-500' }]
+      ? [
+          {
+            id: 'admin' as ActiveTab,
+            label: 'Admin Moderation',
+            icon: <Shield className="w-5 h-5" />,
+            color: 'text-emerald-500',
+          },
+        ]
       : []),
   ];
 

@@ -98,6 +98,28 @@ class PostsService {
     this.posts = [newPost, ...this.posts];
     this.persist();
     realtimeEngine.broadcast('new_post', newPost);
+    realtimeEngine.broadcast('db_posts_updated', this.posts);
+
+    // Persist to Django backend
+    fetch('/api/v1/posts/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': user.id,
+      },
+      body: JSON.stringify({
+        id: newPost.id,
+        author_id: user.id,
+        content: newPost.content,
+        privacy: newPost.privacy,
+        location: newPost.location || '',
+        media_urls: data.mediaUrls || [],
+        post_type: (data.mediaUrls && data.mediaUrls.length > 0) ? 'image' : 'text',
+      }),
+    }).catch((err) => {
+      console.warn('[PostsService] Failed to persist post to backend', err);
+    });
+
     return newPost;
   }
 
@@ -160,6 +182,7 @@ class PostsService {
     this.persist();
     realtimeEngine.broadcast('admin_post_deleted', { postId });
     realtimeEngine.broadcast('db_posts_updated', this.posts);
+    fetch(`/api/v1/posts/${postId}/`, { method: 'DELETE' }).catch(() => {});
   }
 
   hidePost(postId: string) {

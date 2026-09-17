@@ -47,10 +47,10 @@ export const AdminGroupsPages: React.FC = () => {
     action: () => {},
   });
 
-  const filteredGroups = groupsList.filter((g) => g.name.toLowerCase().includes(search.toLowerCase()) || g.description?.toLowerCase().includes(search.toLowerCase()));
-  const filteredPages = pagesList.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()) || p.category?.toLowerCase().includes(search.toLowerCase()));
-  const filteredEvents = eventsList.filter((e) => e.title.toLowerCase().includes(search.toLowerCase()) || e.location?.toLowerCase().includes(search.toLowerCase()));
-  const filteredMarketplace = marketplaceList.filter((m) => m.title.toLowerCase().includes(search.toLowerCase()) || m.category?.toLowerCase().includes(search.toLowerCase()));
+  const filteredGroups = groupsList.filter((g) => (g.name || '').toLowerCase().includes(search.toLowerCase()) || (g.description || '').toLowerCase().includes(search.toLowerCase()));
+  const filteredPages = pagesList.filter((p) => (p.name || '').toLowerCase().includes(search.toLowerCase()) || (p.category || '').toLowerCase().includes(search.toLowerCase()));
+  const filteredEvents = eventsList.filter((e) => (e.title || e.name || '').toLowerCase().includes(search.toLowerCase()) || (e.location || '').toLowerCase().includes(search.toLowerCase()));
+  const filteredMarketplace = marketplaceList.filter((m) => (m.title || '').toLowerCase().includes(search.toLowerCase()) || (m.category || '').toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
@@ -213,12 +213,12 @@ export const AdminGroupsPages: React.FC = () => {
                       <Calendar className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">{e.title}</h4>
-                      <p className="text-[10px] text-slate-400">{e.start_time} · {e.location}</p>
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">{e.title || e.name || 'Event'}</h4>
+                      <p className="text-[10px] text-slate-400">{e.start_time || e.event_date} · {e.location}</p>
                     </div>
                   </div>
                   <span className="px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/60 text-purple-600 text-[10px] font-bold">
-                    {e.going_count || 0} Attending
+                    {e.attendees_count ?? e.going_count ?? 0} Attending
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{e.description}</p>
@@ -232,7 +232,7 @@ export const AdminGroupsPages: React.FC = () => {
                     onClick={() =>
                       setConfirmModalState({
                         isOpen: true,
-                        title: `Delete Event: ${e.title}`,
+                        title: `Delete Event: ${e.title || e.name || 'Event'}`,
                         description: 'Are you sure you want to remove this event listing?',
                         action: () => deleteEvent(e.id),
                       })

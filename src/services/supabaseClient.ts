@@ -1,39 +1,24 @@
-let createClientFunc: any;
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-try {
-  const supabaseModule = require('@supabase/supabase-js');
-  createClientFunc = supabaseModule.createClient;
-} catch (e) {
-  createClientFunc = (url: string, key: string) => ({
-    from: () => ({
-      select: () => Promise.resolve({ data: [], error: null }),
-      insert: () => Promise.resolve({ data: [], error: null }),
-      update: () => Promise.resolve({ data: [], error: null }),
-      delete: () => Promise.resolve({ data: [], error: null }),
-    }),
-    auth: {
-      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-    },
-  });
-}
+// Read env variables safely (Vite exposes them via import.meta.env)
+const supabaseUrl: string = (import.meta as any).env?.VITE_SUPABASE_URL ?? '';
+const supabaseAnonKey: string = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ?? '';
 
-// Read env variables safely
-const metaEnv = (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
-const supabaseUrl = metaEnv.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = metaEnv.VITE_SUPABASE_ANON_KEY || '';
-
-export const isSupabaseConfigured = Boolean(
-  supabaseUrl && 
-  supabaseAnonKey && 
-  supabaseUrl !== 'YOUR_SUPABASE_URL' &&
+/**
+ * True only when real Supabase credentials are configured.
+ * The app falls back to local-storage / demo mode when false.
+ */
+export const isSupabaseConfigured: boolean = Boolean(
+  supabaseUrl &&
+  supabaseAnonKey &&
+  supabaseUrl !== 'https://placeholder.supabase.co' &&
   !supabaseUrl.includes('placeholder')
 );
 
-// Fallback dummy client if no keys provided so app does not crash
-const fallbackUrl = 'https://placeholder.supabase.co';
-const fallbackKey = 'placeholder-anon-key';
-
-export const supabase: any = createClientFunc(
-  isSupabaseConfigured ? supabaseUrl : fallbackUrl,
-  isSupabaseConfigured ? supabaseAnonKey : fallbackKey
+// Always create a real Supabase client (uses placeholder URL when unconfigured).
+// The placeholder URL causes every supabase call to return a network error,
+// which is caught gracefully in authService / supabaseAuthService.
+export const supabase: SupabaseClient = createClient(
+  isSupabaseConfigured ? supabaseUrl : 'https://placeholder.supabase.co',
+  isSupabaseConfigured ? supabaseAnonKey : 'placeholder-anon-key'
 );

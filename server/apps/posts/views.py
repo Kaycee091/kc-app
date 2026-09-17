@@ -25,3 +25,22 @@ class PostViewSet(viewsets.ModelViewSet):
             qs = qs.filter(privacy=privacy)
             
         return qs
+
+    def perform_create(self, serializer):
+        from django.utils import timezone
+        import time
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        author = None
+        if self.request.user and self.request.user.is_authenticated:
+            author = self.request.user
+        else:
+            author_id = self.request.data.get('author_id') or self.request.headers.get('X-User-Id')
+            if author_id:
+                author = User.objects.filter(id=author_id).first()
+            if not author:
+                author = User.objects.first()
+
+        post_id = self.request.data.get('id') or f"post_{int(time.time()*1000)}"
+        serializer.save(id=post_id, author=author)

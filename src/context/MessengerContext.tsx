@@ -23,25 +23,35 @@ export const MessengerProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const { user } = useAuth();
 
   const [conversations, setConversations] = useState<Conversation[]>(() => {
-    const saved = localStorage.getItem('kc_conversations');
-    return saved ? JSON.parse(saved) : DEMO_CONVERSATIONS;
+    if (user?.is_new_user) return [];
+    const saved = localStorage.getItem(`kc_conversations_${user?.id || 'default'}`);
+    if (saved) return JSON.parse(saved);
+    if (!user || user.role === 'user' && !user.is_staff) return [];
+    return DEMO_CONVERSATIONS;
   });
 
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(DEMO_CONVERSATIONS[0]);
+  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [dockedChats, setDockedChats] = useState<UserProfile[]>([]);
   const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>(() => {
-    const saved = localStorage.getItem('kc_messages');
-    return saved ? JSON.parse(saved) : DEMO_MESSAGES;
+    if (user?.is_new_user) return {};
+    const saved = localStorage.getItem(`kc_messages_${user?.id || 'default'}`);
+    if (saved) return JSON.parse(saved);
+    if (!user || user.role === 'user' && !user.is_staff) return {};
+    return DEMO_MESSAGES;
   });
   const [typingMap, setTypingMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
-    localStorage.setItem('kc_conversations', JSON.stringify(conversations));
-  }, [conversations]);
+    if (user) {
+      localStorage.setItem(`kc_conversations_${user.id}`, JSON.stringify(conversations));
+    }
+  }, [conversations, user]);
 
   useEffect(() => {
-    localStorage.setItem('kc_messages', JSON.stringify(messagesMap));
-  }, [messagesMap]);
+    if (user) {
+      localStorage.setItem(`kc_messages_${user.id}`, JSON.stringify(messagesMap));
+    }
+  }, [messagesMap, user]);
 
   // Real-time Event Listener for Messenger
   useEffect(() => {

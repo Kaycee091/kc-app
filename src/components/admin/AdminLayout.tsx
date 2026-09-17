@@ -15,6 +15,7 @@ import { AdminAnalytics } from './AdminAnalytics';
 import { AdminLogs } from './AdminLogs';
 import { AdminRoles } from './AdminRoles';
 import { AdminSettings } from './AdminSettings';
+import { AdminAppeals } from './AdminAppeals';
 
 interface AdminLayoutProps {
   onSwitchToApp: () => void;
@@ -52,6 +53,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onSwitchToApp }) => {
         return <AdminLogs />;
       case 'roles':
         return <AdminRoles />;
+      case 'appeals':
+        return <AdminAppeals />;
       case 'settings':
         return <AdminSettings />;
       default:

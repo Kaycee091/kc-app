@@ -32,6 +32,12 @@ export interface UserProfile {
   is_active?: boolean;
   is_staff?: boolean;
   is_superuser?: boolean;
+  email_verified?: boolean;
+  onboarding_completed?: boolean;
+  is_new_user?: boolean;
+  ban_reason?: string;
+  banned_at?: string;
+  banned_by?: string;
 }
 
 export interface PollOption {
@@ -130,6 +136,7 @@ export interface Group {
   is_joined?: boolean;
   rules?: string[];
   owner_id?: string;
+  category?: string;
   is_private?: boolean;
 }
 
@@ -166,14 +173,17 @@ export interface MarketplaceListing {
 
 export interface EventItem {
   id: string;
-  organizer_id: string;
+  organizer_id?: string;
   organizer?: UserProfile;
   title: string;
+  name?: string;
   description: string;
   location: string;
   start_time: string;
+  event_date?: string;
+  end_time?: string;
   cover_url?: string;
-  rsvp_status?: 'going' | 'interested' | 'not_going';
+  rsvp_status?: 'going' | 'interested' | 'not_going' | null;
   attendees_count: number;
   category?: string;
   interested_count?: number;

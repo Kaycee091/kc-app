@@ -4,6 +4,12 @@ export type RoutePattern =
   | '/'
   | '/home'
   | '/feed'
+  | '/splash'
+  | '/onboarding'
+  | '/auth'
+  | '/login'
+  | '/register'
+  | '/verify-email'
   | '/profile'
   | '/profile/:username'
   | '/friends'
@@ -145,6 +151,12 @@ class Router {
       '/marketplace/:id',
       '/albums/:id',
       '/settings/:subtab',
+      '/splash',
+      '/onboarding',
+      '/auth',
+      '/login',
+      '/register',
+      '/verify-email',
       '/feed',
       '/home',
       '/',

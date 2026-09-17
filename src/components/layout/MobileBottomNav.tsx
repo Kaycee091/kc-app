@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSocial, ActiveTab } from '../../context/SocialContext';
 import { useAuth } from '../../context/AuthContext';
-import { Home, Users, PlusCircle, Bell, Menu } from 'lucide-react';
+import { Home, Users, PlusCircle, Bell, Settings } from 'lucide-react';
 import { clsx } from 'clsx';
 import { router } from '../../router';
 
@@ -68,11 +68,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenCreatePo
       </button>
 
       <button
-        onClick={() => handleTab('profile')}
-        className={clsx('flex flex-col items-center gap-0.5 text-[10px] font-bold', activeTab === 'profile' ? 'text-[#2563EB]' : 'text-slate-500')}
+        onClick={() => router.navigate('/settings')}
+        className={clsx('flex flex-col items-center gap-0.5 text-[10px] font-bold', activeTab === 'settings' ? 'text-[#2563EB]' : 'text-slate-500')}
       >
-        <Menu className="w-5 h-5" />
-        <span>Menu</span>
+        <Settings className="w-5 h-5" />
+        <span>Settings</span>
       </button>
     </nav>
   );

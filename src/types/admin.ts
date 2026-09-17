@@ -4,12 +4,31 @@ export type AdminRole = 'super_admin' | 'admin' | 'moderator' | 'support' | 'use
 
 export type UserAccountStatus = 'active' | 'suspended' | 'banned' | 'pending';
 
+export type AppealStatus = 'pending' | 'under_review' | 'approved' | 'rejected';
+
+export interface BanAppeal {
+  id: string;
+  user?: UserProfile;
+  user_id?: string;
+  ban_reason: string;
+  appeal_message: string;
+  supporting_info?: string;
+  status: AppealStatus;
+  created_at: string;
+  reviewed_at?: string;
+  reviewed_by?: UserProfile;
+  admin_notes?: string;
+}
+
 export interface AdminUser extends UserProfile {
   role: AdminRole;
   status: UserAccountStatus;
   joined_at: string;
   last_active: string;
   ip_address?: string;
+  ban_reason?: string;
+  banned_at?: string;
+  banned_by?: string;
 }
 
 export interface AdminAuditLog {
@@ -18,7 +37,7 @@ export interface AdminAuditLog {
   admin_name: string;
   admin_role: AdminRole;
   action: string;
-  target_type: 'user' | 'post' | 'comment' | 'report' | 'group' | 'page' | 'marketplace' | 'setting' | 'event' | 'story';
+  target_type: 'user' | 'post' | 'comment' | 'report' | 'group' | 'page' | 'marketplace' | 'setting' | 'event' | 'story' | 'appeal';
   target_id: string;
   details: string;
   timestamp: string;

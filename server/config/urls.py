@@ -22,5 +22,6 @@ urlpatterns = [
     path('api/v1/marketplace/', include('apps.marketplace.urls')),
     path('api/v1/search/', include('apps.search.urls')),
     path('api/v1/reports/', include('apps.reports.urls')),
+    path('api/v1/moderation/', include('apps.moderation.urls')),
 ]
 

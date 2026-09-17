@@ -9,6 +9,8 @@ interface AuthContextType {
   isLoading: boolean;
   isOnboarding: boolean;
   setIsOnboarding: (val: boolean) => void;
+  isOnboardingCompleted: boolean;
+  markOnboardingCompleted: () => void;
   pendingVerificationEmail: string | null;
   is2FAEnabled: boolean;
   toggle2FA: (enabled: boolean) => void;
@@ -18,8 +20,9 @@ interface AuthContextType {
   exportUserDataArchive: () => string;
   deactivateAccount: () => void;
   deleteAccount: () => void;
-  signup: (params: SignUpParams) => Promise<{ success: boolean; error?: string }>;
-  verifyEmailCode: (code: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (params: SignUpParams) => Promise<{ success: boolean; devCode?: string; error?: string }>;
+  verifyEmailCode: (code: string, email?: string) => Promise<{ success: boolean; error?: string }>;
+  sendVerificationCode: (email: string) => Promise<{ success: boolean; devCode?: string; error?: string }>;
   login: (loginId: string, pass: string) => Promise<{ success: boolean; user?: UserProfile; error?: string }>;
   logout: () => void;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>;
@@ -31,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(() => authService.getCurrentUser());
   const [isLoading, setIsLoading] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
+  const [isOnboardingCompleted, setIsOnboardingCompleted] = useState<boolean>(() => authService.isOnboardingCompleted());
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
   const [is2FAEnabled, setIs2FAEnabled] = useState<boolean>(() => authService.get2FAStatus());
   const [activeSessions, setActiveSessions] = useState<UserSession[]>(() => authService.getActiveSessions());
@@ -80,24 +84,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signup = async (params: SignUpParams) => {
-    setIsLoading(true);
     const res = await authService.signUp(params);
     if (res.success) {
       setPendingVerificationEmail(params.email);
     }
-    setIsLoading(false);
+    return res; // includes devCode when success
+  };
+
+  const verifyEmailCode = async (code: string, email?: string) => {
+    const res = await authService.verifyEmailCode(code, email);
+    if (res.success && res.user) {
+      // Auto-login: set user in React state so isAuthenticated becomes true
+      setUser(res.user);
+      // Trigger the OnboardingWizard — the next step of the registration flow
+      setIsOnboarding(true);
+    }
     return res;
   };
 
-  const verifyEmailCode = async (code: string) => {
-    setIsLoading(true);
-    const res = await authService.verifyEmailCode(code);
-    if (res.success && res.user) {
-      setUser(res.user);
-      setIsOnboarding(true);
-    }
-    setIsLoading(false);
-    return res;
+  const sendVerificationCode = async (email: string) => {
+    const res = await authService.sendVerificationCode(email);
+    return res; // includes devCode
   };
 
   const login = async (loginId: string, pass: string) => {
@@ -133,6 +140,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         isOnboarding,
         setIsOnboarding,
+        isOnboardingCompleted,
+        markOnboardingCompleted: () => {
+          authService.markOnboardingCompleted();
+          setIsOnboardingCompleted(true);
+        },
         pendingVerificationEmail,
         is2FAEnabled,
         toggle2FA: handleToggle2FA,
@@ -144,6 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteAccount: handleDeleteAccount,
         signup,
         verifyEmailCode,
+        sendVerificationCode,
         login,
         logout,
         updateProfile,

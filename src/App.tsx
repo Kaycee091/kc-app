@@ -42,6 +42,9 @@ import { StoryViewerPage } from './components/pages/StoryViewerPage';
 import { SettingsPage } from './components/pages/SettingsPage';
 import { AdminLoginPage } from './components/admin/AdminLoginPage';
 import { NotFoundPage } from './components/pages/NotFoundPage';
+import { SplashScreen } from './components/auth/SplashScreen';
+import { OnboardingScreens } from './components/auth/OnboardingScreens';
+import { RecommendationBanners } from './components/feed/RecommendationBanners';
 
 const SocialAppContent: React.FC = () => {
   const { user } = useAuth();
@@ -120,12 +123,20 @@ const SocialAppContent: React.FC = () => {
           <p className="text-xs text-slate-500 max-w-md mt-2 mb-6 leading-relaxed">
             The Connecta Administrator Portal requires elevated staff credentials (<code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-rose-500 font-bold">super_admin, admin, moderator, support</code>). Your account (<strong className="text-slate-700 dark:text-slate-300">@{user?.username}</strong>) is currently authenticated as a standard user role.
           </p>
-          <button
-            onClick={() => router.navigate('/feed')}
-            className="px-6 py-2.5 rounded-full bg-[#2563EB] text-white font-bold text-xs shadow-lg shadow-[#2563EB]/25 hover:bg-blue-600 transition-all"
-          >
-            Return to Connecta Feed
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => router.navigate('/admin/login')}
+              className="px-6 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 transition-all"
+            >
+              Sign In with Staff Account
+            </button>
+            <button
+              onClick={() => router.navigate('/feed')}
+              className="px-6 py-2.5 rounded-full bg-[#2563EB] text-white font-bold text-xs shadow-lg shadow-[#2563EB]/25 hover:bg-blue-600 transition-all"
+            >
+              Return to Connecta Feed
+            </button>
+          </div>
         </div>
       );
     }
@@ -244,6 +255,9 @@ const SocialAppContent: React.FC = () => {
               </div>
             </div>
 
+            {/* Discovery & Recommendation Banners */}
+            <RecommendationBanners />
+
             {/* Feed Stream */}
             <div className="space-y-4">
               {filteredPosts.map((post) => (
@@ -297,22 +311,141 @@ const SocialAppContent: React.FC = () => {
 };
 
 const MainContent: React.FC = () => {
-  const { isAuthenticated, isLoading, isOnboarding } = useAuth();
+  const { user, isAuthenticated, isLoading, isOnboarding, isOnboardingCompleted, markOnboardingCompleted } = useAuth();
+  const [routeMatch, setRouteMatch] = useState<RouteMatch>(() => router.matchCurrentRoute());
 
+  // Startup 5-second Splash state: runs once per session launch
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    if (window.location.pathname.startsWith('/admin')) return false;
+    return !sessionStorage.getItem('connecta_startup_splash_done');
+  });
+
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+
+  useEffect(() => {
+    return router.subscribe((match) => {
+      setRouteMatch(match);
+      if (match.pattern === '/onboarding') {
+        setShowOnboarding(true);
+      }
+    });
+  }, []);
+
+  const handleSplashComplete = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('connecta_startup_splash_done', 'true');
+    }
+    setShowSplash(false);
+
+    // If currently on an admin route, stay there
+    if (routeMatch.pattern.startsWith('/admin')) return;
+
+    // STATE A: Returning authenticated user → go straight to feed
+    if (isAuthenticated) {
+      if (['/', '/home', '/splash', '/login', '/register', '/onboarding', '/verify-email'].includes(routeMatch.pattern)) {
+        router.navigate('/feed');
+      }
+      return;
+    }
+
+    // STATE B: Returning user (seen intro before) → show sign-in
+    const introSeen =
+      sessionStorage.getItem('connecta_intro_seen') === 'true' ||
+      isOnboardingCompleted ||
+      localStorage.getItem('connecta_onboarding_completed_device') === 'true';
+
+    if (introSeen) {
+      if (['/', '/home', '/splash', '/onboarding'].includes(routeMatch.pattern)) {
+        router.navigate('/login');
+      }
+      return;
+    }
+
+    // STATE C: Brand-new device / first-time user → 3-screen intro
+    setShowOnboarding(true);
+    if (routeMatch.pattern !== '/onboarding') {
+      router.navigate('/onboarding');
+    }
+  };
+
+  // 1. Admin routes access (handled immediately so admins aren't forced through onboarding/splash)
+  if (routeMatch.pattern.startsWith('/admin')) {
+    if (routeMatch.pattern === '/admin/login' || !isAuthenticated) {
+      return (
+        <AdminProvider>
+          <AdminLoginPage />
+        </AdminProvider>
+      );
+    }
+
+    return (
+      <SocialProvider>
+        <MessengerProvider>
+          <AdminProvider>
+            <SocialAppContent />
+          </AdminProvider>
+        </MessengerProvider>
+      </SocialProvider>
+    );
+  }
+
+  // 2. Initial Startup 5-Second Splash Screen
+  if (showSplash) {
+    return <SplashScreen durationSeconds={5} onComplete={handleSplashComplete} />;
+  }
+
+  // 3. Silent loading fallback (no text shown to user)
   if (isLoading) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#F0F2F5] dark:bg-[#0F172A] p-4 space-y-4">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-black">
         <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-[#2563EB] to-[#8B5CF6] flex items-center justify-center shadow-lg shadow-[#2563EB]/30 animate-pulse">
           <span className="text-white font-black text-2xl tracking-tighter">KC</span>
         </div>
-        <Skeleton className="w-32 h-4" />
       </div>
     );
   }
 
-  if (!isAuthenticated) return <AuthScreen />;
+  // 4. Three-Screen Onboarding INTRO for brand-new devices
+  if (showOnboarding || routeMatch.pattern === '/onboarding') {
+    return (
+      <OnboardingScreens
+        onComplete={() => {
+          // Only mark the intro screens as seen — NOT the profile wizard.
+          // The profile wizard (OnboardingWizard) is marked complete after registration.
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('connecta_intro_seen', 'true');
+          }
+          setShowOnboarding(false);
+          // Send the user to Create Account, not Login
+          router.navigate('/register');
+        }}
+      />
+    );
+  }
+
+  // 5. Unauthenticated → show AuthScreen
+  // Guard: if user landed on a protected route while unauthenticated, silently
+  // rewrite the URL to /login so AuthScreen picks up the correct initial mode.
+  if (!isAuthenticated) {
+    const PROTECTED_PREFIXES = ['/feed', '/profile', '/friends', '/messages',
+      '/notifications', '/search', '/groups', '/pages', '/events', '/marketplace',
+      '/memories', '/saved', '/photos', '/albums', '/videos', '/watch', '/settings',
+      '/following', '/stories'];
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      const isProtected = PROTECTED_PREFIXES.some((p) => path === p || path.startsWith(p + '/'));
+      if (isProtected) {
+        window.history.replaceState({}, '', '/login');
+      }
+    }
+    return <AuthScreen />;
+  }
+
+  // 6. Post-registration wizard if any
   if (isOnboarding) return <OnboardingWizard />;
 
+  // 7. Authenticated User -> Main Social Application
   return (
     <SocialProvider>
       <MessengerProvider>

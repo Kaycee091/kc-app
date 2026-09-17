@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AdminRole, AdminUser, AdminAuditLog, SystemNotification, AdminStats, PlatformSettings } from '../types/admin';
+import { AdminRole, AdminUser, AdminAuditLog, SystemNotification, AdminStats, PlatformSettings, BanAppeal } from '../types/admin';
 import { UserProfile, Post, Group, Page, EventItem, MarketplaceListing } from '../types/social';
 import { DEMO_USERS, DEMO_POSTS, DEMO_GROUPS, DEMO_PAGES, DEMO_EVENTS, DEMO_MARKETPLACE } from '../services/mockSocialData';
 import { useAuth } from './AuthContext';
@@ -8,6 +8,7 @@ import { realtimeEngine } from '../services/realtimeService';
 import { adminService } from '../services/adminService';
 import { reportsService, ReportItem, ReportStatus } from '../services/reportsService';
 import { postsService } from '../services/postsService';
+import { appealsService } from '../services/appealsService';
 
 export type AdminRoute =
   | 'dashboard'
@@ -15,6 +16,7 @@ export type AdminRoute =
   | 'posts'
   | 'comments'
   | 'reports'
+  | 'appeals'
   | 'moderation'
   | 'roles'
   | 'groups'
@@ -67,6 +69,12 @@ interface AdminContextType {
   resolveReport: (reportId: string, notes: string) => void;
   dismissReport: (reportId: string, notes: string) => void;
   assignModerator: (reportId: string, moderatorId: string, moderatorName: string) => void;
+  
+  // Ban Appeal Actions
+  appealsList: BanAppeal[];
+  approveAppeal: (appealId: string, notes?: string) => Promise<void>;
+  rejectAppeal: (appealId: string, notes?: string) => Promise<void>;
+  refreshAppeals: () => Promise<void>;
 
   // Group / Page / Event / Marketplace Actions
   toggleGroupStatus: (groupId: string) => void;
@@ -119,6 +127,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // 3. Reports List
   const [reportsList, setReportsList] = useState<ReportItem[]>(() => reportsService.getReports());
 
+  // 3.5 Appeals List
+  const [appealsList, setAppealsList] = useState<BanAppeal[]>([]);
+
   // 4. Groups, Pages, Events, Marketplace
   const [groupsList, setGroupsList] = useState<Group[]>(() => {
     const saved = localStorage.getItem(GROUPS_KEY);
@@ -149,11 +160,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Realtime Subscriptions
   useEffect(() => {
+    // Initial fetch of ban appeals
+    appealsService.getAppeals().then(setAppealsList);
+
     const unsubUsers = realtimeEngine.subscribe('db_users_updated', (dbUsers: any[]) => {
       setUsersList(
         dbUsers.map((u) => ({
           ...u,
-          role: (u.role as AdminRole) || (u.id === 'user_alex' ? 'super_admin' : u.id === 'user_sarah' ? 'moderator' : 'user'),
+          role: (u.role as AdminRole) || 'user',
           status: u.status || 'active',
           joined_at: u.created_at || new Date(Date.now() - 90 * 86400000).toISOString(),
           last_active: u.last_seen || new Date().toISOString(),
@@ -168,6 +182,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const unsubReports = realtimeEngine.subscribe('db_reports_updated', (reports: ReportItem[]) => {
       setReportsList(reports);
+    });
+
+    const unsubAppeals = realtimeEngine.subscribe('db_appeals_updated', (appeals: BanAppeal[]) => {
+      setAppealsList(appeals);
     });
 
     const unsubNotifs = realtimeEngine.subscribe('db_sys_notifs_updated', (notifs: SystemNotification[]) => {
@@ -186,10 +204,112 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       unsubUsers();
       unsubPosts();
       unsubReports();
+      unsubAppeals();
       unsubNotifs();
       unsubLogs();
       unsubSettings();
     };
+  }, []);
+
+  // ── Sync real users and posts from Django DB into Admin Dashboard ───────────
+  useEffect(() => {
+    // Fetch users
+    fetch('/api/v1/users/?format=json&limit=500')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return;
+        const djangoUsers: any[] = Array.isArray(data) ? data : (data.results || []);
+        if (!djangoUsers.length) return;
+
+        setUsersList((prev) => {
+          const existingIds = new Set(prev.map((u) => u.id));
+          const merged = [...prev];
+          for (const du of djangoUsers) {
+            if (!existingIds.has(du.id)) {
+              merged.push({
+                id: du.id,
+                username: du.username,
+                email: du.email,
+                first_name: du.first_name,
+                last_name: du.last_name,
+                full_name: du.full_name || `${du.first_name} ${du.last_name}`.trim(),
+                avatar_url: du.profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${du.username}`,
+                role: (du.role as AdminRole) || 'user',
+                status: du.status || 'active',
+                email_verified: du.email_verified ?? true,
+                is_online: false,
+                joined_at: du.date_joined || new Date().toISOString(),
+                last_active: du.last_active || du.date_joined || new Date().toISOString(),
+                friends_count: 0,
+                followers_count: 0,
+                following_count: 0,
+                created_at: du.date_joined || new Date().toISOString(),
+                ban_reason: du.ban_reason || '',
+                banned_at: du.banned_at || undefined,
+              } as AdminUser);
+            } else {
+              const idx = merged.findIndex((u) => u.id === du.id);
+              if (idx >= 0) {
+                merged[idx] = {
+                  ...merged[idx],
+                  status: du.status || merged[idx].status,
+                  role: (du.role as AdminRole) || merged[idx].role,
+                  email: du.email || merged[idx].email,
+                  ban_reason: du.ban_reason !== undefined ? du.ban_reason : merged[idx].ban_reason,
+                  banned_at: du.banned_at || merged[idx].banned_at,
+                };
+              }
+            }
+          }
+          return merged;
+        });
+      })
+      .catch(() => {});
+
+    // Fetch posts from Django DB
+    fetch('/api/v1/posts/?limit=500')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return;
+        const djangoPosts: any[] = Array.isArray(data) ? data : (data.results || []);
+        if (djangoPosts.length > 0) {
+          setPostsList((prev) => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const newPosts: Post[] = [];
+            for (const dp of djangoPosts) {
+              if (!existingIds.has(dp.id)) {
+                newPosts.push({
+                  id: dp.id,
+                  author_id: dp.author?.id || 'unknown',
+                  author: dp.author || {
+                    id: 'unknown',
+                    username: 'user',
+                    first_name: 'User',
+                    last_name: '',
+                    full_name: 'User',
+                    is_online: false,
+                  },
+                  content: dp.content || '',
+                  privacy: dp.privacy || 'public',
+                  location: dp.location || '',
+                  media: (dp.media_urls || []).map((url: string, i: number) => ({
+                    id: `m_${dp.id}_${i}`,
+                    media_type: 'image',
+                    url,
+                  })),
+                  reactions: [],
+                  comments: [],
+                  comments_count: dp.comments_count || 0,
+                  shares_count: 0,
+                  created_at: dp.created_at || new Date().toISOString(),
+                });
+              }
+            }
+            return [...newPosts, ...prev];
+          });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const logAdminAction = (
@@ -213,6 +333,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setUsersList(updated);
     authService.saveUsersToDb(updated);
     if (user?.id === userId) authService.updateProfile({ status: 'suspended' });
+    // Persist to Django DB
+    fetch(`/api/v1/users/${userId}/suspend/`, { method: 'POST', headers: { 'Content-Type': 'application/json' } }).catch(() => {});
     realtimeEngine.broadcast('admin_user_status_change', { userId, status: 'suspended' });
     logAdminAction('Suspended User Account', 'user', userId, reason || 'Suspended for policy violation');
   };
@@ -222,24 +344,34 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setUsersList(updated);
     authService.saveUsersToDb(updated);
     if (user?.id === userId) authService.updateProfile({ status: 'active' });
+    // Persist to Django DB
+    fetch(`/api/v1/users/${userId}/restore/`, { method: 'POST', headers: { 'Content-Type': 'application/json' } }).catch(() => {});
     realtimeEngine.broadcast('admin_user_status_change', { userId, status: 'active' });
     logAdminAction('Unsuspended User Account', 'user', userId, 'Account restored to active status');
   };
 
   const banUser = (userId: string, reason?: string) => {
-    const updated = usersList.map((u) => (u.id === userId ? { ...u, status: 'banned' as const } : u));
+    const updated = usersList.map((u) => (u.id === userId ? { ...u, status: 'banned' as const, ban_reason: reason || '' } : u));
     setUsersList(updated);
     authService.saveUsersToDb(updated);
     if (user?.id === userId) authService.updateProfile({ status: 'banned' });
+    // Persist ban to Django DB
+    fetch(`/api/v1/users/${userId}/ban/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason || 'Banned for severe terms violation' }),
+    }).catch(() => {});
     realtimeEngine.broadcast('admin_user_status_change', { userId, status: 'banned' });
     logAdminAction('Permanently Banned User', 'user', userId, reason || 'Banned for severe terms violation');
   };
 
   const unbanUser = (userId: string) => {
-    const updated = usersList.map((u) => (u.id === userId ? { ...u, status: 'active' as const } : u));
+    const updated = usersList.map((u) => (u.id === userId ? { ...u, status: 'active' as const, ban_reason: '' } : u));
     setUsersList(updated);
     authService.saveUsersToDb(updated);
     if (user?.id === userId) authService.updateProfile({ status: 'active' });
+    // Persist unban to Django DB
+    fetch(`/api/v1/users/${userId}/unban/`, { method: 'POST', headers: { 'Content-Type': 'application/json' } }).catch(() => {});
     realtimeEngine.broadcast('admin_user_status_change', { userId, status: 'active' });
     logAdminAction('Unbanned User Account', 'user', userId, 'User ban revoked');
   };
@@ -248,6 +380,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const updated = usersList.filter((u) => u.id !== userId);
     setUsersList(updated);
     authService.saveUsersToDb(updated);
+    // Persist deletion to Django DB
+    fetch(`/api/v1/users/${userId}/`, { method: 'DELETE' }).catch(() => {});
     realtimeEngine.broadcast('admin_user_status_change', { userId, status: 'deleted' });
     logAdminAction('Deleted User Account', 'user', userId, 'Permanently deleted user profile');
   };
@@ -266,6 +400,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setUsersList(updated);
     authService.saveUsersToDb(updated);
     if (user?.id === userId) authService.updateProfile(updates);
+    // Persist to Django DB via update_profile custom action
+    fetch(`/api/v1/users/${userId}/update_profile/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    }).catch(() => {});
     logAdminAction('Updated User Profile', 'user', userId, 'Administrative profile edits applied');
   };
 
@@ -320,6 +460,31 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     reportsService.assignModerator(reportId, moderatorId, moderatorName);
     setReportsList(reportsService.getReports());
     logAdminAction('Assigned Report Moderator', 'report', reportId, `Assigned to ${moderatorName}`);
+  };
+
+  // Ban Appeals Management
+  const refreshAppeals = async () => {
+    const appeals = await appealsService.getAppeals();
+    setAppealsList(appeals);
+  };
+
+  const approveAppeal = async (appealId: string, notes?: string) => {
+    await appealsService.approveAppeal(appealId, notes);
+    const updatedAppeals = await appealsService.getAppeals();
+    setAppealsList(updatedAppeals);
+    // Unban the user associated with this appeal
+    const appeal = updatedAppeals.find((a) => a.id === appealId) || appealsList.find((a) => a.id === appealId);
+    if (appeal?.user_id) {
+      unbanUser(appeal.user_id);
+    }
+    logAdminAction('Approved Ban Appeal', 'user', appealId, notes || 'Appeal reviewed and approved — user unbanned');
+  };
+
+  const rejectAppeal = async (appealId: string, notes?: string) => {
+    await appealsService.rejectAppeal(appealId, notes);
+    const updatedAppeals = await appealsService.getAppeals();
+    setAppealsList(updatedAppeals);
+    logAdminAction('Rejected Ban Appeal', 'user', appealId, notes || 'Appeal reviewed and rejected — ban maintained');
   };
 
   // Groups, Pages, Events, Marketplace Actions
@@ -470,6 +635,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         createSystemNotification,
         deleteSystemNotification,
         updateSettings,
+        appealsList,
+        approveAppeal,
+        rejectAppeal,
+        refreshAppeals,
         logAdminAction,
         clearAuditLogs,
       }}

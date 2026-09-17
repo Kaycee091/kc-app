@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { AdminUser, AdminRole } from '../../types/admin';
 import { Avatar } from '../ui/Avatar';
@@ -211,6 +211,7 @@ export const AdminUsers: React.FC = () => {
                           <Eye className="w-4 h-4" />
                         </button>
 
+                        {/* Suspend / Unsuspend */}
                         {u.status === 'suspended' ? (
                           <button
                             onClick={() => unsuspendUser(u.id)}
@@ -219,7 +220,7 @@ export const AdminUsers: React.FC = () => {
                           >
                             <UserCheck className="w-4 h-4" />
                           </button>
-                        ) : (
+                        ) : u.status !== 'banned' ? (
                           <button
                             onClick={() => triggerSuspendConfirm(u)}
                             className="p-2 rounded-xl text-amber-500 hover:bg-amber-50"
@@ -227,15 +228,26 @@ export const AdminUsers: React.FC = () => {
                           >
                             <ShieldAlert className="w-4 h-4" />
                           </button>
-                        )}
+                        ) : null}
 
-                        <button
-                          onClick={() => triggerBanConfirm(u)}
-                          className="p-2 rounded-xl text-rose-500 hover:bg-rose-50"
-                          title="Ban User"
-                        >
-                          <UserX className="w-4 h-4" />
-                        </button>
+                        {/* Ban / Unban Toggle */}
+                        {u.status === 'banned' ? (
+                          <button
+                            onClick={() => unbanUser(u.id)}
+                            className="p-2 rounded-xl text-emerald-600 hover:bg-emerald-50"
+                            title="Unban User (Restore Access)"
+                          >
+                            <UserCheck className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => triggerBanConfirm(u)}
+                            className="p-2 rounded-xl text-rose-500 hover:bg-rose-50"
+                            title="Permanently Ban User"
+                          >
+                            <UserX className="w-4 h-4" />
+                          </button>
+                        )}
 
                         <button
                           onClick={() => triggerDeleteConfirm(u)}
